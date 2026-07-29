@@ -344,14 +344,25 @@ class DataManager:
     def get_xp_info(self):
         """Return (xp, level, level_name, xp_in_level, xp_for_level)."""
         xp  = self.data["settings"]["xp"]
+
+        # Calculate level: how many thresholds (from LEVELS[1:]) are <= xp, plus 1
         lvl = 1
-        for i, threshold in enumerate(LEVELS[1:], 1):
+        for threshold in LEVELS[1:]:  # Skip the first element (0)
             if xp >= threshold:
-                lvl = i
+                lvl += 1
+            else:
+                break
+
+        # Cap at maximum level defined in LEVEL_NAMES
         lvl = min(lvl, len(LEVEL_NAMES))
-        prev = LEVELS[lvl - 1]
-        nxt  = LEVELS[lvl] if lvl < len(LEVELS) else LEVELS[-1]
-        return xp, lvl, LEVEL_NAMES[lvl - 1], xp - prev, max(1, nxt - prev)
+
+        # Calculate progress within current level
+        prev_threshold = LEVELS[lvl - 1]
+        next_threshold = LEVELS[lvl] if lvl < len(LEVELS) else LEVELS[-1]
+        xp_in_level = xp - prev_threshold
+        xp_for_level = next_threshold - prev_threshold
+
+        return xp, lvl, LEVEL_NAMES[lvl - 1], xp_in_level, xp_for_level
 
     # ── Statistics ──────────────────────────────────────────────────
     def get_week_pcts(self):
@@ -1046,7 +1057,6 @@ class HabitFlowApp:
         self._filter_btns = {}
         for cat in ["All"] + CAT_LIST:
             col = CATEGORIES.get(cat, self.c["surface2"])
-            fg  = "white" if cat == "All" else "white"
             btn = tk.Label(filter_frame, text=cat,
                            bg=self.c["surface2"] if cat != "All" else self.c["primary"],
                            fg=self.c["text"] if cat != "All" else "white",
