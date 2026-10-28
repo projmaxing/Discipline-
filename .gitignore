@@ -8,4 +8,4 @@ temp_replace.py
 original_habit.py
 
 # Claude
-.claude/
+.claude/artifacts/
