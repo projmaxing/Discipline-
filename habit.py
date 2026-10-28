@@ -892,17 +892,18 @@ def draw_icon(canvas, name, cx, cy, size=18, color="#FFFFFF", width=1.7, tags=("
         line([6, 6, 18, 18])
         line([18, 6, 6, 18])
     elif name == "sun":
-        circle(12, 12, 4.4)
+        circle(12, 12, 3.7, filled=True, w=1)
         for angle in range(0, 360, 45):
             import math as _math
 
             rad = _math.radians(angle)
-            line([12 + 7 * _math.cos(rad), 12 + 7 * _math.sin(rad),
-                  12 + 9.2 * _math.cos(rad), 12 + 9.2 * _math.sin(rad)], w=1.5)
+            line([12 + 6.1 * _math.cos(rad), 12 + 6.1 * _math.sin(rad),
+                  12 + 8.6 * _math.cos(rad), 12 + 8.6 * _math.sin(rad)], w=1.6)
     elif name == "moon":
-        canvas.create_arc(X(3.5), Y(3), X(20.5), Y(21), start=60, extent=245,
-                          style="arc", outline=color, width=width + 0.2, tags=tags)
-        line([16.5, 6, 19, 9])
+        # Filled crescent: a disc with an offset disc punched out in the canvas colour.
+        bg = canvas.cget("bg")
+        canvas.create_oval(X(5.5), Y(3), X(19.5), Y(21), fill=color, outline=color, tags=tags)
+        canvas.create_oval(X(11.5), Y(0.5), X(24.5), Y(16.5), fill=bg, outline=bg, tags=tags)
     elif name == "download":
         line([12, 3.5, 12, 15])
         line([7, 10.5, 12, 15.5, 17, 10.5])
