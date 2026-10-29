@@ -30,6 +30,7 @@ import random
 import shutil
 import sys
 import tempfile
+import time
 import tkinter as tk
 import tkinter.font as tkfont
 import uuid
@@ -41,7 +42,7 @@ from tkinter import filedialog, messagebox, ttk
 # CONSTANTS
 # ==================================================================
 APP_NAME = "HabitFlow"
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 DATA_DIR = os.path.join(os.path.expanduser("~"), ".habitflow")
 DATA_FILE = os.path.join(DATA_DIR, "data.json")
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
@@ -130,19 +131,19 @@ DEFAULT_TASKS = [
 THEMES = {
     "dark": {
         "name": "dark",
-        "bg": "#070B14",
-        "bg_alt": "#090E19",
-        "surface": "#0C1322",
-        "surface2": "#111A2B",
-        "surface3": "#16223A",
-        "card": "#0C1322",
-        "card2": "#101A2C",
-        "border": "#1B2942",
-        "border_hi": "#2B3D5C",
+        "bg": "#05070B",
+        "bg_alt": "#070A0F",
+        "surface": "#0A0D13",
+        "surface2": "#0E1219",
+        "surface3": "#141A24",
+        "card": "#0A0D13",
+        "card2": "#0D1118",
+        "border": "#191F2A",
+        "border_hi": "#2A3444",
         "primary": "#2E8BFF",
         "primary_l": "#7FB4FF",
         "primary_d": "#1A4FA8",
-        "primary_soft": "#10213B",
+        "primary_soft": "#0B1730",
         "cyan": "#22D3EE",
         "cyan_soft": "#0C2B36",
         "purple": "#8B5CF6",
@@ -152,22 +153,22 @@ THEMES = {
         "success": "#34D399",
         "warning": "#F2B33D",
         "danger": "#F0616B",
-        "text": "#E8EEF9",
-        "text2": "#9AACBF",
-        "text3": "#6B7D95",
-        "sidebar": "#080D18",
-        "sidebar2": "#0C1424",
+        "text": "#F2F6FC",
+        "text2": "#9AA8BA",
+        "text3": "#687687",
+        "sidebar": "#04060A",
+        "sidebar2": "#090D14",
         "side_text": "#E8EEF9",
         "side_text2": "#93A5BD",
-        "side_active": "#13223A",
-        "prog_bg": "#16233A",
-        "ring_track": "#16223A",
-        "highlight": "#14243C",
-        "shadow": "#04070D",
+        "side_active": "#101823",
+        "prog_bg": "#141A24",
+        "ring_track": "#141A24",
+        "highlight": "#121923",
+        "shadow": "#000000",
         "on_accent": "#04121B",
-        "scrim": "#070B14",
-        "toast": "#121C2E",
-        "track": "#16223A",
+        "scrim": "#05070B",
+        "toast": "#11161F",
+        "track": "#141A24",
     },
     "light": {
         "name": "light",
@@ -360,6 +361,8 @@ class DataManager:
         settings.setdefault("daily_quote_date", "")
         settings.setdefault("daily_quote_idx", 0)
         settings.setdefault("perfect_day_awarded", "")
+        settings.setdefault("window_alpha", 0.93)
+        settings.setdefault("animations", True)
 
         for index, task in enumerate(data["tasks"]):
             task.setdefault("id", str(uuid.uuid4()))
@@ -406,6 +409,8 @@ class DataManager:
                 "daily_quote_date": "",
                 "daily_quote_idx": 0,
                 "perfect_day_awarded": "",
+                "window_alpha": 0.93,
+                "animations": True,
             },
         }
 
@@ -1010,7 +1015,6 @@ from tkinter import filedialog, messagebox, ttk
 # CONSTANTS
 # ==================================================================
 APP_NAME = "HabitFlow"
-VERSION = "2.1.0"
 DATA_DIR = os.path.join(os.path.expanduser("~"), ".habitflow")
 DATA_FILE = os.path.join(DATA_DIR, "data.json")
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
@@ -1099,19 +1103,19 @@ DEFAULT_TASKS = [
 THEMES = {
     "dark": {
         "name": "dark",
-        "bg": "#070B14",
-        "bg_alt": "#090E19",
-        "surface": "#0C1322",
-        "surface2": "#111A2B",
-        "surface3": "#16223A",
-        "card": "#0C1322",
-        "card2": "#101A2C",
-        "border": "#1B2942",
-        "border_hi": "#2B3D5C",
+        "bg": "#05070B",
+        "bg_alt": "#070A0F",
+        "surface": "#0A0D13",
+        "surface2": "#0E1219",
+        "surface3": "#141A24",
+        "card": "#0A0D13",
+        "card2": "#0D1118",
+        "border": "#191F2A",
+        "border_hi": "#2A3444",
         "primary": "#2E8BFF",
         "primary_l": "#7FB4FF",
         "primary_d": "#1A4FA8",
-        "primary_soft": "#10213B",
+        "primary_soft": "#0B1730",
         "cyan": "#22D3EE",
         "cyan_soft": "#0C2B36",
         "purple": "#8B5CF6",
@@ -1121,22 +1125,22 @@ THEMES = {
         "success": "#34D399",
         "warning": "#F2B33D",
         "danger": "#F0616B",
-        "text": "#E8EEF9",
-        "text2": "#9AACBF",
-        "text3": "#6B7D95",
-        "sidebar": "#080D18",
-        "sidebar2": "#0C1424",
+        "text": "#F2F6FC",
+        "text2": "#9AA8BA",
+        "text3": "#687687",
+        "sidebar": "#04060A",
+        "sidebar2": "#090D14",
         "side_text": "#E8EEF9",
         "side_text2": "#93A5BD",
-        "side_active": "#13223A",
-        "prog_bg": "#16233A",
-        "ring_track": "#16223A",
-        "highlight": "#14243C",
-        "shadow": "#04070D",
+        "side_active": "#101823",
+        "prog_bg": "#141A24",
+        "ring_track": "#141A24",
+        "highlight": "#121923",
+        "shadow": "#000000",
         "on_accent": "#04121B",
-        "scrim": "#070B14",
-        "toast": "#121C2E",
-        "track": "#16223A",
+        "scrim": "#05070B",
+        "toast": "#11161F",
+        "track": "#141A24",
     },
     "light": {
         "name": "light",
@@ -1472,6 +1476,9 @@ class Card(tk.Frame):
               fill=self._fill, tags=("bg",))
         rrect(canvas, 0.5, 0.5, width - 0.5, height - 0.5, self._radius,
               outline=self._border, width=1, tags=("bg",))
+        # single light hairline across the top: reads as a glass edge
+        canvas.create_line(max(self._radius, 6), 1.0, width - max(self._radius, 6), 1.0,
+                           fill=mix(self._fill, "#FFFFFF", 0.07), tags=("bg",))
         if self._accent:
             inset = self._radius * 0.85
             rrect(canvas, 0.5, inset, 3.5, height - inset, 1.5,
@@ -1519,34 +1526,55 @@ class Card(tk.Frame):
 # PILL - small rounded label for metadata
 # ==================================================================
 class Pill(tk.Canvas):
+    """Small rounded label used for metadata; text can change in place."""
+
     def __init__(self, parent, app, text, color=None, bg=None, dot=False, icon=None,
                  filled=False, size=9, height=22, padx=9):
         self.c = app.c
-        color = color or self.c["text2"]
-        host = bg or parent.cget("bg")
-        weight = "bold"
-        font = (FONT_FAMILY, size, weight)
-        measure = tkfont.Font(font=font)
-        leading = 0
-        if dot:
-            leading += 11
-        if icon:
-            leading += 17
-        width = int(measure.measure(text) + padx * 2 + leading)
-        super().__init__(parent, width=width, height=height, bg=host,
-                         highlightthickness=0, bd=0)
-        fill = color if filled else mix(color, host, 0.86)
-        fg = readable_on(color) if filled else color
+        self._color = color or self.c["text2"]
+        self._host = bg or parent.cget("bg")
+        self._dot = dot
+        self._icon = icon
+        self._filled = filled
+        self._size = size
+        self._height = height
+        self._padx = padx
+        self._text = text
+        super().__init__(parent, width=self._measure(text), height=height,
+                         bg=self._host, highlightthickness=0, bd=0)
+        self._paint()
+
+    def _measure(self, text):
+        width = tkfont.Font(font=(FONT_FAMILY, self._size, "bold")).measure(text)
+        leading = (11 if self._dot else 0) + (17 if self._icon else 0)
+        return int(width + self._padx * 2 + leading)
+
+    def _paint(self):
+        self.delete("all")
+        color, host = self._color, self._host
+        height, padx = self._height, self._padx
+        font = (FONT_FAMILY, self._size, "bold")
+        width = self._measure(self._text)
+        self.configure(width=width)
+        fill = color if self._filled else mix(color, host, 0.86)
+        fg = readable_on(color) if self._filled else color
         rrect(self, 0, 0, width, height, height / 2, fill=fill)
         x = padx
-        if dot:
+        if self._dot:
             cy = height / 2
             self.create_oval(x - 1, cy - 3.5, x + 6, cy + 3.5, fill=fg, outline="")
             x += 11
-        if icon:
-            draw_icon(self, icon, x + 6, height / 2, size=13, color=fg, width=1.7)
+        if self._icon:
+            draw_icon(self, self._icon, x + 6, height / 2, size=13, color=fg, width=1.7)
             x += 17
-        self.create_text(x, height / 2 + 0.5, text=text, anchor="w", font=font, fill=fg)
+        self.create_text(x, height / 2 + 0.5, text=self._text, anchor="w",
+                         font=font, fill=fg)
+
+    def set_text(self, text):
+        if text == self._text:
+            return
+        self._text = text
+        self._paint()
 
 
 # ==================================================================
@@ -1748,7 +1776,15 @@ class IconButton(tk.Canvas):
 
 
 class CheckCircle(tk.Canvas):
-    """Habit completion control: rounded square that fills when done."""
+    """Habit completion control: a rounded square that fills and strokes its tick.
+
+    The tick is a two-segment path revealed by its own arc length, so completion
+    lands as a drawn check instead of an icon appearing in one frame.  A single
+    expanding ripple carries the "logged" feeling without any sustained glow.
+    """
+
+    CHECK_MS = 165
+    RIPPLE_MS = 280
 
     def __init__(self, parent, app, checked=False, color=None, command=None,
                  size=26, bg=None):
@@ -1759,6 +1795,8 @@ class CheckCircle(tk.Canvas):
         self._command = command
         self._size = size
         self._hover = False
+        self._progress = 1.0 if self._checked else 0.0
+        self._job = None
         self._host = bg or parent.cget("bg")
         super().__init__(parent, width=size, height=size, bg=self._host,
                          highlightthickness=0, bd=0, cursor="hand2")
@@ -1767,40 +1805,138 @@ class CheckCircle(tk.Canvas):
         self.bind("<Button-1>", self._on_click)
         self._draw()
 
+    # -- geometry ------------------------------------------------------
+    @staticmethod
+    def _lerp(a, b, t):
+        return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+    def _tick_points(self):
+        size = self._size
+        return ((0.29 * size, 0.53 * size), (0.44 * size, 0.68 * size),
+                (0.72 * size, 0.36 * size))
+
+    # -- painting ------------------------------------------------------
+    def _draw(self, scale=1.0, progress=None, ripple=None):
+        self.delete("all")
+        size = self._size
+        centre = size / 2
+        inset = 1.5
+        p = self._progress if progress is None else progress
+
+        if ripple:
+            spread = size * 0.55 * ripple
+            tint = mix(self._host, self._color, max(0.0, 1.0 - ripple))
+            self.create_oval(centre - spread, centre - spread, centre + spread,
+                             centre + spread, outline=tint, width=1.4)
+
+        filled = self._checked
+        half = (centre - inset) * scale
+        outline = None
+        if not filled:
+            outline = self.c["primary"] if self._hover else self.c["border_hi"]
+        rrect(self, centre - half, centre - half, centre + half, centre + half,
+              size * 0.30 * scale, fill=self._color if filled else None,
+              outline=outline, width=1.6)
+
+        if filled and p > 0.001:
+            p0, p1, p2 = self._tick_points()
+            l1 = math.dist(p0, p1)
+            l2 = math.dist(p1, p2)
+            target = p * (l1 + l2)
+            if target <= l1:
+                path = (p0, self._lerp(p0, p1, target / l1 if l1 else 0.0))
+            else:
+                path = (p0, p1, self._lerp(p1, p2, (target - l1) / l2 if l2 else 1.0))
+            flat = []
+            for point in path:
+                flat.extend(point)
+            self.create_line(*flat, fill=readable_on(self._color), width=2.4,
+                             capstyle="round", joinstyle="round")
+
+    # -- interaction ---------------------------------------------------
     def _set_hover(self, hover):
         self._hover = hover
         self._draw()
 
-    def _draw(self, scale=1.0, fill=None):
-        self.delete("all")
-        size = self._size
-        inset = 1.5
-        if fill is None:
-            fill = self._color if self._checked else None
-        outline = None
-        if not self._checked:
-            outline = self.c["primary"] if self._hover else self.c["border_hi"]
-        box = size / 2 - (size / 2 - inset) * scale
-        rrect(self, box, box, size - box, size - box, (size * 0.30) * scale,
-              fill=fill, outline=outline, width=1.6)
-        if self._checked:
-            draw_icon(self, "check", size / 2, size / 2, size=size * 0.60,
-                      color=readable_on(fill or self._color), width=2.4)
-
-    def _on_click(self, _event):
+    def _on_click(self, _event=None):
         if self._command:
             self._command()
 
+    def _cancel(self):
+        if self._job is not None:
+            try:
+                self.after_cancel(self._job)
+            except tk.TclError:
+                pass
+            self._job = None
+
+    def _animate_in(self):
+        self._cancel()
+        started = time.perf_counter()
+        span = self.RIPPLE_MS / 1000.0
+
+        def step():
+            self._job = None
+            if not self.winfo_exists():
+                return
+            t = min(1.0, (time.perf_counter() - started) / span)
+            tick = max(0.0, min(1.0, (t - 0.18) / 0.72))
+            scale = 1.0 + 0.14 * math.sin(math.pi * min(1.0, t / 0.45))
+            self._progress = tick
+            if t < 1.0:
+                self._draw(scale=scale, progress=tick, ripple=t)
+                self._job = self.after(16, step)
+            else:
+                self._progress = 1.0
+                self._draw()
+
+        step()
+
+    def _animate_out(self):
+        self._cancel()
+        started = time.perf_counter()
+        span = 0.11
+
+        def step():
+            self._job = None
+            if not self.winfo_exists():
+                return
+            t = min(1.0, (time.perf_counter() - started) / span)
+            if t < 1.0:
+                self._draw(scale=1.0 - 0.10 * t, progress=1.0 - t)
+                self._job = self.after(16, step)
+            else:
+                self._checked = False
+                self._progress = 0.0
+                self._draw()
+
+        step()
+
     def set_checked(self, checked, animate=False):
+        checked = bool(checked)
         was = self._checked
-        self._checked = bool(checked)
+        if checked == was and self._job is not None:
+            # the dashboard refreshes rows right after a toggle; don't cut the tick off
+            return
+        if checked and not was:
+            self._checked = True
+            self._progress = 0.0
+            self._animate_in()
+            return
+        if animate and was and not checked:
+            self._animate_out()
+            return
+        self._cancel()
+        self._checked = checked
+        self._progress = 1.0 if checked else 0.0
         self._draw()
-        if animate and self._checked and not was:
-            self._pop()
 
     def _pop(self):
-        for index, scale in enumerate((1.16, 1.08, 1.0)):
-            self.after(index * 45, lambda s=scale: self.winfo_exists() and self._draw(s))
+        """Compatibility shim: replay the fill-and-tick motion."""
+        self._checked = True
+        self._progress = 0.0
+        self._animate_in()
+
 
 # ==================================================================
 # DATA VISUALS
@@ -1833,20 +1969,20 @@ class ProgressRing(tk.Canvas):
             except tk.TclError:
                 pass
         start = self._pct
-        steps = 20
-        interval = max(12, int(duration / steps))
+        started = time.perf_counter()
+        span = max(0.05, duration / 1000.0)
 
-        def step(index):
+        def step():
             if not self.winfo_exists():
                 return
-            t = index / steps
+            t = min(1.0, (time.perf_counter() - started) / span)
             eased = 1 - (1 - t) ** 3
             self._pct = start + (pct - start) * eased
             self._draw(self._pct)
-            if index < steps:
-                self._animation = self.after(interval, lambda: step(index + 1))
+            if t < 1.0:
+                self._animation = self.after(16, step)
 
-        step(1)
+        step()
 
     def _draw(self, pct):
         self.delete("all")
@@ -1870,10 +2006,24 @@ class ProgressRing(tk.Canvas):
             dot = max(2.6, thickness * 0.30)
             self.create_oval(cx - dot, cy - dot, cx + dot, cy + dot,
                              fill=c["cyan"], outline="")
-        self.create_text(size / 2, size / 2 - 4, text=f"{int(round(pct * 100))}%",
-                         font=(FONT_FAMILY, int(size * 0.21), "bold"), fill=c["text"])
-        self.create_text(size / 2, size / 2 + int(size * 0.15), text=self._caption,
-                         font=(FONT_FAMILY, 9), fill=c["text2"])
+        # "100%" is far wider than "7%": shrink the label until it clears the arc
+        label = f"{int(round(pct * 100))}%"
+        limit = max(40, size - 2 * thickness - 24)
+        base = int(size * 0.21)
+        if getattr(self, "_probe", None) is None:
+            self._probe = tkfont.Font(font=(FONT_FAMILY, base, "bold"))
+            self._cap_probe = tkfont.Font(font=(FONT_FAMILY, 9))
+            self._probe.configure(size=base)
+        self._probe.configure(size=base)
+        width = max(1, self._probe.measure(label))
+        font_size = base if width <= limit else max(9, int(base * limit / width))
+        self.create_text(size / 2, size / 2 - 3, text=label,
+                         font=(FONT_FAMILY, font_size, "bold"), fill=c["text"])
+        cap_limit = max(34, limit - 10)
+        cap_width = max(1, self._cap_probe.measure(self._caption))
+        cap_size = 9 if cap_width <= cap_limit else max(6, int(9 * cap_limit / cap_width))
+        self.create_text(size / 2, size / 2 + int(size * 0.16), text=self._caption,
+                         font=(FONT_FAMILY, cap_size), fill=c["text2"])
 
 
 class SegmentBar(tk.Canvas):
@@ -1955,13 +2105,19 @@ class WeekBars(tk.Canvas):
             self._draw(1.0)
 
     def _animate(self):
-        if not self.winfo_exists():
-            return
-        self._progress = min(1.0, self._progress + 0.13)
-        eased = 1 - (1 - self._progress) ** 2.4 if self._progress < 1 else 1.0
-        self._draw(eased)
-        if self._progress < 1:
-            self.after(26, self._animate)
+        started = time.perf_counter()
+        span = 0.55
+
+        def step():
+            if not self.winfo_exists():
+                return
+            t = min(1.0, (time.perf_counter() - started) / span)
+            self._progress = t
+            self._draw(1 - (1 - t) ** 2.4)
+            if t < 1.0:
+                self.after(22, step)
+
+        step()
 
     def _draw(self, progress):
         self.delete("all")
@@ -2054,13 +2210,19 @@ class TrendChart(tk.Canvas):
         self.after(80, self._animate)
 
     def _animate(self):
-        if not self.winfo_exists():
-            return
-        self._progress = min(1.0, self._progress + 0.12)
-        eased = 1 - (1 - self._progress) ** 2.5 if self._progress < 1 else 1.0
-        self._draw(eased)
-        if self._progress < 1:
-            self.after(26, self._animate)
+        started = time.perf_counter()
+        span = 0.65
+
+        def step():
+            if not self.winfo_exists():
+                return
+            t = min(1.0, (time.perf_counter() - started) / span)
+            self._progress = t
+            self._draw(1 - (1 - t) ** 2.5)
+            if t < 1.0:
+                self.after(24, step)
+
+        step()
 
     def _draw(self, progress=1.0):
         self.delete("all")
@@ -2210,19 +2372,27 @@ class StatTile(Card):
 class MilestoneRow(tk.Frame):
     """Compact achievement line with an earned / locked state."""
 
-    def __init__(self, parent, app, item):
+    def __init__(self, parent, app, item, unlock=False):
         c = app.c
         bg = parent.cget("bg")
         super().__init__(parent, bg=bg)
         earned = bool(item.get("earned"))
-        color = c["success"] if earned else c["text3"]
+        self._c = c
+        self._bg = bg
+        self._icon_name = item["icon"]
+        self._color = c["success"] if earned else c["text3"]
+        self._track = mix(c["text3"], bg, 0.78)
+        self._target = max(0.0, min(1.0, item.get("fraction", 1.0 if earned else 0.0)))
+        self._fraction = 0.0 if unlock else self._target
         self.columnconfigure(1, weight=1)
 
-        icon = tk.Canvas(self, width=30, height=30, bg=bg, highlightthickness=0, bd=0)
-        icon.grid(row=0, column=0, sticky="w", padx=(0, 11))
-        rrect(icon, 0, 0, 30, 30, 9,
-              fill=mix(color, bg, 0.84) if earned else mix(c["surface3"], bg, 0.5))
-        draw_icon(icon, item["icon"], 15, 15, size=15, color=color,
+        self._icon = tk.Canvas(self, width=30, height=30, bg=bg,
+                               highlightthickness=0, bd=0)
+        self._icon.grid(row=0, column=0, sticky="w", padx=(0, 11))
+        rrect(self._icon, 0, 0, 30, 30, 9,
+              fill=mix(self._color, bg, 0.84) if earned
+              else mix(c["surface3"], bg, 0.5))
+        draw_icon(self._icon, item["icon"], 15, 15, size=15, color=self._color,
                   width=1.7 if earned else 1.6)
 
         text = tk.Frame(self, bg=bg)
@@ -2233,29 +2403,65 @@ class MilestoneRow(tk.Frame):
         tk.Label(text, text=item.get("desc", ""), bg=bg, fg=c["text3"], font=f(9),
                  anchor="w").pack(anchor="w")
 
-        track = mix(c["text3"], bg, 0.78)
-        fraction = item.get("fraction", 1.0 if earned else 0.0)
-        bar = tk.Canvas(self, width=58, height=4, bg=bg, highlightthickness=0, bd=0)
-        bar.grid(row=0, column=2, padx=(14, 12))
-        bar.bind("<Configure>",
-                 lambda _e, canvas=bar, f=fraction, col=color, tr=track:
-                 self._draw_bar(canvas, f, col, tr))
+        self._bar = tk.Canvas(self, width=58, height=4, bg=bg,
+                              highlightthickness=0, bd=0)
+        self._bar.grid(row=0, column=2, padx=(14, 12))
+        self._bar.bind("<Configure>", lambda _e=None: self._draw_bar())
 
         tk.Label(self, text="Earned" if earned else item.get("progress", ""), bg=bg,
                  fg=c["success"] if earned else c["text3"],
                  font=f(9, "bold" if earned else "normal"), anchor="e", width=7).grid(
             row=0, column=3, sticky="e")
 
-    @staticmethod
-    def _draw_bar(canvas, fraction, color, track):
-        canvas.delete("all")
-        width = canvas.winfo_width()
+        if unlock:
+            self.after(180, self._play_unlock)
+
+    def _draw_bar(self, fraction=None):
+        self._bar.delete("all")
+        width = self._bar.winfo_width()
         if width < 4:
             return
-        rrect(canvas, 0, 0, width, 4, 2, fill=track)
-        if fraction > 0:
-            rrect(canvas, 0, 0, max(4, width * max(0.0, min(1.0, fraction))), 4, 2,
-                  fill=color)
+        value = self._fraction if fraction is None else fraction
+        rrect(self._bar, 0, 0, width, 4, 2, fill=self._track)
+        if value > 0:
+            rrect(self._bar, 0, 0, max(4, width * max(0.0, min(1.0, value))), 4, 2,
+                  fill=self._color)
+
+    def _play_unlock(self):
+        """Fill the bar from zero, then pulse the badge once."""
+        if not self.winfo_exists():
+            return
+        steps = 12
+        target = self._target
+
+        def step(index):
+            if not self.winfo_exists():
+                return
+            t = index / steps
+            self._fraction = target * (1 - (1 - t) ** 3)
+            self._draw_bar()
+            if index < steps:
+                self.after(28, lambda: step(index + 1))
+            else:
+                self._pulse_badge()
+
+        step(1)
+
+    def _pulse_badge(self):
+        sizes = (15, 17, 19, 17, 15)
+
+        def pulse(index):
+            if not self._icon.winfo_exists():
+                return
+            self._icon.delete("pulse")
+            draw_icon(self._icon, self._icon_name, 15, 15, size=sizes[index],
+                      color=self._color, width=1.9, tags=("pulse",))
+            if index + 1 < len(sizes):
+                self.after(70, lambda: pulse(index + 1))
+            else:
+                self._icon.delete("pulse")
+
+        pulse(0)
 
 # ==================================================================
 # TOASTS
@@ -2324,6 +2530,188 @@ def show_toast(root, message, theme, kind="success", duration=2600):
 
     fade(0, 1)
     toast.after(duration, dismiss)
+
+
+# ==================================================================
+# CELEBRATIONS - short HUD cards used for streaks and milestones
+# ==================================================================
+class Celebration(tk.Toplevel):
+    """A frameless, fading card with confetti.
+
+    Tk cannot make individual widgets translucent, so this lives in its own
+    borderless window: the window alpha fades the card in and out, and on
+    Windows the background colour is keyed out so only the rounded card
+    shows.  Every effect degrades to a plain card where the platform or the
+    window manager does not support it.
+    """
+
+    WIDTH = 412
+    HEIGHT = 132
+
+    def __init__(self, app, title, subtitle, icon, accent, xp=None, on_close=None,
+                 kicker="MILESTONE"):
+        self.app = app
+        self.c = app.c
+        self._on_close = on_close
+        self._closed = False
+        self._phase = "in"
+        self._accent = accent
+        self._kicker = kicker
+        super().__init__(app.root)
+        try:
+            self.overrideredirect(True)
+            self.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        try:
+            self.attributes("-transparentcolor", self.c["bg"])
+        except tk.TclError:
+            pass
+        self.configure(bg=self.c["bg"])
+
+        root = app.root
+        try:
+            root.update_idletasks()
+            x = root.winfo_rootx() + max(0, root.winfo_width() - self.WIDTH - 28)
+            y = root.winfo_rooty() + max(0, root.winfo_height() - self.HEIGHT - 28)
+        except tk.TclError:
+            x, y = 200, 120
+        self.geometry(f"{self.WIDTH}x{self.HEIGHT}+{x}+{y}")
+
+        self.canvas = tk.Canvas(self, width=self.WIDTH, height=self.HEIGHT,
+                                bg=self.c["bg"], highlightthickness=0, bd=0,
+                                cursor="hand2")
+        self.canvas.pack()
+        self.canvas.bind("<Button-1>", lambda _e=None: self.dismiss())
+
+        self._draw_card(title, subtitle, icon, accent, xp)
+        self._particles = []
+        self._spawn(accent, burst=True)
+        self._alpha = 0.0
+        self._set_alpha(0.0)
+        self._fade_in(0)
+        self.after(2350, self._hold_end)
+        self.after(28, self._tick)
+
+    # -- drawing -----------------------------------------------------
+    def _draw_card(self, title, subtitle, icon, accent, xp):
+        c = self.c
+        width, height = self.WIDTH, self.HEIGHT
+        rrect(self.canvas, 1, 1, width - 1, height - 1, 16, fill=c["card"])
+        rrect(self.canvas, 1, 1, width - 1, height - 1, 16,
+              outline=mix(c["border"], accent, 0.55), width=1)
+        rrect(self.canvas, 1, 16, 4, height - 16, 1.6, fill=accent)
+
+        tile_size = 38
+        tile = tk.Canvas(self, width=tile_size, height=tile_size, bg=c["card"],
+                         highlightthickness=0, bd=0)
+        tile.place(x=20, y=(height - tile_size) / 2)
+        rrect(tile, 0, 0, tile_size, tile_size, 12, fill=mix(accent, c["card"], 0.80))
+        rrect(tile, 0, 0, tile_size, tile_size, 12,
+              outline=mix(accent, c["card"], 0.45), width=1)
+        draw_icon(tile, icon, tile_size / 2, tile_size / 2, size=19, color=accent,
+                  width=1.8)
+
+        text_x = 74
+        self.canvas.create_text(text_x, height / 2 - 22, text=self._kicker, anchor="w",
+                                font=(FONT_FAMILY, 8, "bold"), fill=accent)
+        self.canvas.create_text(text_x, height / 2 + 1, text=title, anchor="w",
+                                font=(FONT_FAMILY, 16, "bold"), fill=c["text"])
+        self.canvas.create_text(text_x, height / 2 + 23, text=subtitle, anchor="w",
+                                font=(FONT_FAMILY, 9), fill=c["text2"])
+        if xp:
+            self.canvas.create_text(width - 20, height / 2 + 23, text=xp, anchor="e",
+                                    font=(FONT_FAMILY, 9, "bold"), fill=c["success"])
+
+    def _spawn(self, accent, burst=False):
+        c = self.c
+        palette = [accent, c["cyan"], c["purple_l"], c["warning"], c["success"]]
+        # geometry() has not been applied yet, so winfo_width() is still 1 here:
+        # seed against the known card size or the burst lands in a 1px column.
+        width, height = self.WIDTH, self.HEIGHT
+        for _ in range(16 if burst else 3):
+            size = random.choice((2, 2, 3, 4))
+            x = random.uniform(12, width - 12)
+            y = random.uniform(4, height * 0.6) if burst else random.uniform(-14, 4)
+            item = self.canvas.create_oval(x, y, x + size, y + size,
+                                           fill=random.choice(palette), outline="")
+            self._particles.append({
+                "id": item, "vx": random.uniform(-0.9, 0.9),
+                "vy": random.uniform(0.7, 1.9), "size": size,
+            })
+
+    # -- animation ---------------------------------------------------
+    def _tick(self):
+        if self._closed or not self.winfo_exists():
+            return
+        height = self.HEIGHT
+        alive = []
+        for particle in self._particles:
+            try:
+                self.canvas.move(particle["id"], particle["vx"], particle["vy"])
+                coords = self.canvas.coords(particle["id"])
+            except tk.TclError:
+                continue
+            particle["vy"] += 0.16
+            particle["vx"] *= 0.995
+            if coords and (coords[2] < -4 or coords[0] > self.WIDTH + 4):
+                self.canvas.delete(particle["id"])
+                continue
+            if coords and coords[1] > height + 8:
+                if self._phase == "hold":
+                    x = random.uniform(10, self.WIDTH - 10)
+                    self.canvas.coords(particle["id"], x, -6, x + particle["size"],
+                                       -6 + particle["size"])
+                    particle["vy"] = random.uniform(0.7, 1.7)
+                    particle["vx"] = random.uniform(-0.7, 0.7)
+                    alive.append(particle)
+                else:
+                    self.canvas.delete(particle["id"])
+            else:
+                alive.append(particle)
+        self._particles = alive
+        if self._phase == "hold" and len(self._particles) < 10:
+            self._spawn(self._accent)
+        self.after(30, self._tick)
+
+    def _set_alpha(self, value):
+        try:
+            self.attributes("-alpha", max(0.0, min(1.0, value)))
+        except tk.TclError:
+            pass
+
+    def _fade_in(self, step):
+        if self._closed or not self.winfo_exists():
+            return
+        self._set_alpha(step / 6)
+        if step < 6:
+            self.after(24, lambda: self._fade_in(step + 1))
+        else:
+            self._phase = "hold"
+
+    def _hold_end(self):
+        self._phase = "out"
+        self._fade_out(6)
+
+    def _fade_out(self, step):
+        if self._closed or not self.winfo_exists():
+            return
+        self._set_alpha(step / 6)
+        if step > 0:
+            self.after(22, lambda: self._fade_out(step - 1))
+        else:
+            self.dismiss()
+
+    def dismiss(self):
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            self.destroy()
+        except tk.TclError:
+            pass
+        if self._on_close:
+            self._on_close()
 
 # ==================================================================
 # FORM CONTROLS
@@ -2906,13 +3294,18 @@ class ViewHelpersMixin:
         header.pack(fill="x", padx=PAGE_PAD, pady=(28, 0))
         text = tk.Frame(header, bg=c["bg"])
         text.pack(side="left")
-        tk.Label(text, text=title, bg=c["bg"], fg=c["text"], font=f(26, "bold"),
-                 anchor="w").pack(anchor="w")
+        title_label = tk.Label(text, text=title, bg=c["bg"], fg=c["text"],
+                               font=f(26, "bold"), anchor="w")
+        title_label.pack(anchor="w")
+        subtitle_label = None
         if subtitle:
-            tk.Label(text, text=subtitle, bg=c["bg"], fg=c["text2"], font=f(11),
-                     anchor="w").pack(anchor="w", pady=(3, 0))
+            subtitle_label = tk.Label(text, text=subtitle, bg=c["bg"],
+                                      fg=c["text2"], font=f(11), anchor="w")
+            subtitle_label.pack(anchor="w", pady=(3, 0))
         if action is not None:
             action(header)
+        header.title_label = title_label
+        header.subtitle_label = subtitle_label
         return header
 
     def _section_title(self, parent, text, meta=None, padx=PAGE_PAD, pady=(26, 10)):
@@ -3057,12 +3450,15 @@ class DashboardViewMixin(ViewHelpersMixin):
                         icon="plus", kind="primary", bg=c["bg"], height=38,
                         padx=18).pack(side="right")
 
-        self._page_header(
+        date_line = (f"{WEEKDAY_FULL[today.weekday()]}, "
+                     f"{today.strftime('%d %B %Y')}")
+        header = self._page_header(
             page, self._greeting(),
-            f"{WEEKDAY_FULL[today.weekday()]}, {today.strftime('%d %B %Y')}  ·  "
-            f"{self._day_phrase(done, total)}",
+            f"{date_line}  ·  {self._day_phrase(done, total)}",
             header_action,
         )
+        self._dashboard["subtitle"] = header.subtitle_label
+        self._dashboard["date_line"] = date_line
 
         # -- hero ----------------------------------------------------
         hero = Card(page, self, radius=CARD_RADIUS + 2, pad=(24, 20),
@@ -3163,8 +3559,10 @@ class DashboardViewMixin(ViewHelpersMixin):
         head.pack(fill="x")
         tk.Label(head, text="Today's habits", bg=c["card"], fg=c["text"],
                  font=f(13, "bold"), anchor="w").pack(side="left")
-        Pill(head, self, f"{done}/{total}" if total else "0", color=c["primary"],
-             bg=c["card"], filled=False, height=22, size=9).pack(side="right")
+        self._dashboard["pill"] = Pill(
+            head, self, f"{done}/{total}" if total else "0", color=c["primary"],
+            bg=c["card"], filled=False, height=22, size=9)
+        self._dashboard["pill"].pack(side="right")
         tk.Label(focus.body, text="Pinned habits stay at the top", bg=c["card"],
                  fg=c["text3"], font=f(9), anchor="w").pack(anchor="w", pady=(3, 12))
 
@@ -3208,8 +3606,10 @@ class DashboardViewMixin(ViewHelpersMixin):
         week_head.pack(fill="x")
         tk.Label(week_head, text="This week", bg=c["card"], fg=c["text"],
                  font=f(13, "bold"), anchor="w").pack(side="left")
-        tk.Label(week_head, text=f"{week_avg}% avg", bg=c["card"], fg=c["primary_l"],
-                 font=f(10, "bold"), anchor="e").pack(side="right")
+        self._dashboard["week_avg"] = tk.Label(
+            week_head, text=f"{week_avg}% avg", bg=c["card"], fg=c["primary_l"],
+            font=f(10, "bold"), anchor="e")
+        self._dashboard["week_avg"].pack(side="right")
         labels = [day.strftime("%a") for day in self.dm.get_week_dates()]
         bars = WeekBars(week_card.body, self, height=170, values=week,
                         labels=labels, highlight=today.weekday(), bg=c["card"])
@@ -3259,13 +3659,15 @@ class DashboardViewMixin(ViewHelpersMixin):
             return "every habit complete"
         return f"{total - done} habit{'s' if total - done != 1 else ''} left today"
 
-    def _render_milestones(self, parent, limit=None):
+    def _render_milestones(self, parent, limit=None, unlock=()):
         for child in parent.winfo_children():
             child.destroy()
         items = self._achievements()
         shown = items if limit is None else items[:limit]
+        unlock = set(unlock or ())
         for item in shown:
-            MilestoneRow(parent, self, item).pack(fill="x", pady=3)
+            row = MilestoneRow(parent, self, item, unlock=item["name"] in unlock)
+            row.pack(fill="x", pady=3)
 
     # -- live updates -------------------------------------------------
     def _refresh_dashboard_progress(self):
@@ -3291,11 +3693,19 @@ class DashboardViewMixin(ViewHelpersMixin):
             else "Add your first habit to start today's score")
         state["mark_all"].set_enabled(bool(total) and done < total)
 
+        if state.get("subtitle") is not None:
+            state["subtitle"].configure(
+                text=f"{state.get('date_line', '')}  ·  "
+                     f"{self._day_phrase(done, total)}")
+        if state.get("pill") is not None:
+            state["pill"].set_text(f"{done}/{total}" if total else "0")
         tiles = state.get("tiles") or {}
         if tiles.get("streak") is not None:
             tiles["streak"].set_value(str(streak), hint=f"best {self.dm.best_streak()}")
         week = self.dm.get_week_pcts()
         week_avg = round(sum(week) / 7) if week else 0
+        if state.get("week_avg") is not None:
+            state["week_avg"].configure(text=f"{week_avg}% avg")
         if tiles.get("week") is not None:
             tiles["week"].set_value(f"{week_avg}%")
         if state.get("bars") is not None:
@@ -3936,6 +4346,45 @@ class SettingsViewMixin(ViewHelpersMixin):
                   command=lambda label: self._apply_theme(label.lower()),
                   bg=c["card"], option_width=86, height=32).pack(side="right")
 
+        self._settings_section(page, "Window & motion")
+        window_card = Card(page, self, radius=CARD_RADIUS, pad=(20, 18))
+        window_card.pack(fill="x", padx=PAGE_PAD)
+        glass_row = tk.Frame(window_card.body, bg=c["card"])
+        glass_row.pack(fill="x")
+        IconTile(glass_row, self, "layers", color=c["cyan"], size=36,
+                 bg=c["card"]).pack(side="left")
+        glass_text = tk.Frame(glass_row, bg=c["card"])
+        glass_text.pack(side="left", padx=14)
+        tk.Label(glass_text, text="Glass window", bg=c["card"], fg=c["text"],
+                 font=f(11, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(glass_text, text="Let the desktop show through the window",
+                 bg=c["card"], fg=c["text3"], font=f(10), anchor="w").pack(anchor="w")
+        Segmented(glass_row, self, ["Solid", "Glass", "Clear"], self.glass_label(),
+                  command=self.set_glass, bg=c["card"], option_width=72,
+                  height=32).pack(side="right")
+
+        hairline(window_card.body, self, pady=(16, 14))
+
+        motion_row = tk.Frame(window_card.body, bg=c["card"])
+        motion_row.pack(fill="x")
+        IconTile(motion_row, self, "spark", color=c["purple_l"], size=36,
+                 bg=c["card"]).pack(side="left")
+        motion_text = tk.Frame(motion_row, bg=c["card"])
+        motion_text.pack(side="left", padx=14)
+        tk.Label(motion_text, text="Celebration animations", bg=c["card"],
+                 fg=c["text"], font=f(11, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(motion_text,
+                 text="Confetti cards for perfect days, streaks and achievements",
+                 bg=c["card"], fg=c["text3"], font=f(10), anchor="w").pack(anchor="w")
+        Switch(motion_row, self, value=self.animations_on(), bg=c["card"],
+               command=self.set_animations).pack(side="right")
+
+        tk.Label(window_card.body,
+                 text="Window opacity is applied by the operating system compositor; "
+                      "without one the window stays solid.",
+                 bg=c["card"], fg=c["text3"], font=f(9), anchor="w",
+                 justify="left", wraplength=780).pack(anchor="w", pady=(14, 0))
+
         self._settings_section(page, "Your data")
         data_card = Card(page, self, radius=CARD_RADIUS, pad=(20, 18))
         data_card.pack(fill="x", padx=PAGE_PAD)
@@ -4196,11 +4645,15 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
         self._habit_rows = {}
         self._dashboard_rows = {}
         self._dashboard = {}
+        self._celebration_active = None
+        self._celebration_queue = []
 
         self._setup_window()
         self._build_layout()
         self._show("Dashboard")
         self._tick_clock()
+        # some window managers reset wm attributes on first map
+        self.root.after(120, self._apply_window_alpha)
 
         if self.dm.award_perfect_day_if_due():
             self.root.after(600, lambda: self.toast("Perfect day complete  ·  +50 XP", "xp"))
@@ -4219,9 +4672,89 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
         for index, (_icon, name) in enumerate(self.NAV_ITEMS):
             self.root.bind(f"<Control-Key-{index + 1}>",
                            lambda _e, n=name: self._show(n))
+        self._apply_window_alpha()
+
+    # -- window glass & motion ----------------------------------------
+    def window_alpha(self):
+        try:
+            value = float(self.dm.data["settings"].get("window_alpha", 0.96))
+        except (TypeError, ValueError):
+            value = 0.96
+        return max(0.70, min(1.0, value))
+
+    def _apply_window_alpha(self):
+        try:
+            self.root.attributes("-alpha", self.window_alpha())
+        except tk.TclError:
+            pass
+
+    def set_window_alpha(self, alpha):
+        alpha = max(0.70, min(1.0, float(alpha)))
+        self.dm.data["settings"]["window_alpha"] = round(alpha, 2)
+        self.dm.save()
+        self._apply_window_alpha()
+
+    def glass_label(self):
+        alpha = self.window_alpha()
+        if alpha >= 0.995:
+            return "Solid"
+        if alpha >= 0.93:
+            return "Glass"
+        return "Clear"
+
+    def set_glass(self, label):
+        self.set_window_alpha({"Solid": 1.0, "Glass": 0.95, "Clear": 0.88}.get(label, 0.95))
+
+    def animations_on(self):
+        return bool(self.dm.data["settings"].get("animations", True))
+
+    def set_animations(self, value):
+        self.dm.data["settings"]["animations"] = bool(value)
+        self.dm.save()
+        if not value:
+            self._celebration_queue = []
+            self._close_celebration()
 
     def toast(self, message, kind="success"):
         show_toast(self.root, message, self.c, kind=kind)
+
+    # -- celebrations --------------------------------------------------
+    def celebrate(self, title, subtitle, icon, accent, xp=None, kicker="MILESTONE"):
+        """Queue a HUD celebration card; only one is ever on screen."""
+        if not self.animations_on():
+            return
+        if getattr(self, "_celebration_active", None) is not None:
+            self._celebration_queue.append((title, subtitle, icon, accent, xp, kicker))
+            return
+        self._show_celebration(title, subtitle, icon, accent, xp, kicker)
+
+    def _show_celebration(self, title, subtitle, icon, accent, xp=None,
+                          kicker="MILESTONE"):
+        try:
+            self._celebration_active = Celebration(
+                self, title, subtitle, icon, accent, xp=xp, kicker=kicker,
+                on_close=self._celebration_finished)
+        except tk.TclError:
+            self._celebration_active = None
+
+    def _celebration_finished(self):
+        self._celebration_active = None
+        queue = getattr(self, "_celebration_queue", [])
+        if queue:
+            nxt = queue.pop(0)
+            try:
+                self.root.after(120, lambda: self._show_celebration(*nxt))
+            except tk.TclError:
+                pass
+
+    def _close_celebration(self):
+        overlay = getattr(self, "_celebration_active", None)
+        if overlay is not None:
+            try:
+                overlay.dismiss()
+            except tk.TclError:
+                pass
+        self._celebration_active = None
 
     # -- layout ------------------------------------------------------
     def _build_layout(self):
@@ -4371,7 +4904,7 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
 
         tk.Frame(self.main, bg=c["border"], height=1).pack(fill="x")
 
-    def _draw_streak_chip(self):
+    def _draw_streak_chip(self, pulse=False):
         canvas = self._streak_chip
         c = self.c
         streak = self.dm.calculate_streak()
@@ -4388,6 +4921,38 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
         draw_icon(canvas, "flame", 20, 16, size=15, color=color, width=1.8)
         canvas.create_text(32, 16, anchor="w", text=label, font=font,
                            fill=c["text"] if highlight else c["text2"])
+        if pulse and highlight and self.animations_on():
+            self._pulse_streak_chip(width, color)
+
+    def _pulse_streak_chip(self, width, color):
+        """Expand a ring around the streak chip and float a +1 label."""
+        canvas = self._streak_chip
+        c = self.c
+        steps = 10
+
+        def frame(step):
+            if not canvas.winfo_exists():
+                return
+            canvas.delete("fx")
+            t = step / steps
+            grow = 1 + 9 * t
+            fade = mix(color, c["bg"], min(1.0, 0.15 + t))
+            rrect(canvas, -grow, -grow, width + grow, 32 + grow, 16 + grow,
+                  outline=fade, width=1.2, tags=("fx",))
+            if step < 5:
+                size = 15 + 4 * math.sin(math.pi * step / 5)
+                draw_icon(canvas, "flame", 20, 16, size=size, color=color,
+                          width=1.9, tags=("fx",))
+            if step < 6:
+                canvas.create_text(width / 2, 9 - step * 1.7, text="+1",
+                                   font=(FONT_FAMILY, 9, "bold"),
+                                   fill=mix(color, c["bg"], step / 6), tags=("fx",))
+            if step < steps:
+                canvas.after(45, lambda: frame(step + 1))
+            else:
+                canvas.delete("fx")
+
+        frame(0)
 
     # -- navigation --------------------------------------------------
     def _show(self, view_name: str):
@@ -4419,6 +4984,51 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
             "Settings": self._view_settings,
         }[view_name]()
 
+        for child in list(self.content.winfo_children()):
+            self._transition_page(child)
+
+    def _transition_page(self, page):
+        """Slide a freshly built page up into place behind a short HUD sweep."""
+        if not self.animations_on():
+            return
+        try:
+            page.pack_forget()
+            page.place(x=0, y=18, relwidth=1, relheight=1)
+        except tk.TclError:
+            return
+        sweep = tk.Canvas(self.content, bg=self.c["bg"], highlightthickness=0, bd=0)
+        sweep.place(x=0, y=0, relwidth=1, height=2)
+        started = time.perf_counter()
+        span = 0.22
+
+        def step():
+            try:
+                if not page.winfo_exists():
+                    return
+                t = min(1.0, (time.perf_counter() - started) / span)
+                eased = 1 - (1 - t) ** 3
+                page.place_configure(y=int(round(18 * (1 - eased))))
+                width = max(1, self.content.winfo_width())
+                head = int(width * eased)
+                sweep.delete("all")
+                for index in range(16):
+                    x = head - index * 7
+                    if x < 0 or x > width:
+                        continue
+                    fade = max(0.0, 0.55 * (1 - index / 16.0))
+                    sweep.create_line(x, 1, x + 10, 1, width=2,
+                                      fill=mix(self.c["bg"], self.c["cyan"], fade))
+                if t < 1.0:
+                    self.root.after(16, step)
+                else:
+                    page.place_forget()
+                    page.pack(fill="both", expand=True)
+                    sweep.destroy()
+            except tk.TclError:
+                pass
+
+        step()
+
     def _refresh(self):
         self._show(self._active_view or "Dashboard")
 
@@ -4430,14 +5040,22 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
                 pass
 
     # -- completion handling -----------------------------------------
+    def _earned_achievements(self):
+        return {item["name"] for item in self._achievements() if item["earned"]}
+
+    def _progress_snapshot(self):
+        return {"earned": self._earned_achievements(),
+                "streak": self.dm.calculate_streak()}
+
     def _toggle_task(self, task):
         done_ids = self.dm.get_completed_today()
         new_state = task["id"] not in done_ids
+        before = self._progress_snapshot()
         self.dm.toggle_task(task["id"], new_state)
-        self._after_completion_change(task, new_state)
+        self._after_completion_change(task, new_state, before)
         return new_state
 
-    def _after_completion_change(self, task, completed):
+    def _after_completion_change(self, task, completed, before=None):
         if self.dm.award_perfect_day_if_due():
             self.toast("Perfect day complete  ·  +50 XP", "xp")
         elif completed:
@@ -4455,6 +5073,42 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
             self._refresh_sidebar_xp()
         else:
             self._refresh_sidebar_xp()
+        if completed and before is not None:
+            self._celebrate_progress(before)
+
+    def _celebrate_progress(self, before):
+        """Fire the motion for a streak extension, milestones and perfect days."""
+        if not self.animations_on():
+            return
+        today = date.today()
+        streak = self.dm.calculate_streak()
+        perfect = self.dm.is_perfect_day(today)
+        new_achievements = self._earned_achievements() - before.get("earned", set())
+
+        if perfect:
+            self.celebrate("Perfect day", "Every habit complete", "trophy",
+                           self.c["success"], xp=f"+{XP_PERFECT_DAY} XP",
+                           kicker="DAY COMPLETE")
+        else:
+            for item in self._achievements():
+                if item["name"] in new_achievements:
+                    self.celebrate(item["name"], item["desc"], item["icon"],
+                                   self.c["primary_l"], xp="Unlocked",
+                                   kicker="ACHIEVEMENT")
+
+        if streak > before.get("streak", 0):
+            self._draw_streak_chip(pulse=True)
+            if streak in (3, 7, 14, 30, 60, 100, 180, 365):
+                self.celebrate(f"{streak}-day streak", "Consistency compounding",
+                               "flame", self.c["warning"], kicker="STREAK")
+
+        holder = getattr(self, "_milestone_holder", None)
+        if holder is not None and new_achievements:
+            try:
+                if holder.winfo_exists():
+                    self._render_milestones(holder, limit=4, unlock=new_achievements)
+            except tk.TclError:
+                pass
 
     # -- habit actions ------------------------------------------------
     def _open_add_task(self, _event=None):
@@ -4487,12 +5141,15 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
         if not pending:
             self.toast("Everything is already complete", "info")
             return
+        before = self._progress_snapshot()
         for task in pending:
             self.dm.toggle_task(task["id"], True)
         self.dm.award_perfect_day_if_due()
+        self._refresh_sidebar_xp()
         self._show(self._active_view or "Dashboard")
         self.toast(f"{len(pending)} habit{'s' if len(pending) != 1 else ''} completed",
                    "success")
+        self._celebrate_progress(before)
 
     # -- theme --------------------------------------------------------
     def _toggle_theme(self):
@@ -4536,6 +5193,7 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
                 self.root.after_cancel(self._clock_job)
             except tk.TclError:
                 pass
+        self._close_celebration()
         try:
             self.dm.save()
         finally:
