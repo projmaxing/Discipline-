@@ -131,19 +131,19 @@ DEFAULT_TASKS = [
 THEMES = {
     "dark": {
         "name": "dark",
-        "bg": "#070B14",
-        "bg_alt": "#090E19",
-        "surface": "#0C1322",
-        "surface2": "#111A2B",
-        "surface3": "#16223A",
-        "card": "#0C1322",
-        "card2": "#101A2C",
-        "border": "#1B2942",
-        "border_hi": "#2B3D5C",
+        "bg": "#05070B",
+        "bg_alt": "#070A0F",
+        "surface": "#0A0D13",
+        "surface2": "#0E1219",
+        "surface3": "#141A24",
+        "card": "#0A0D13",
+        "card2": "#0D1118",
+        "border": "#191F2A",
+        "border_hi": "#2A3444",
         "primary": "#2E8BFF",
         "primary_l": "#7FB4FF",
         "primary_d": "#1A4FA8",
-        "primary_soft": "#10213B",
+        "primary_soft": "#0B1730",
         "cyan": "#22D3EE",
         "cyan_soft": "#0C2B36",
         "purple": "#8B5CF6",
@@ -153,22 +153,22 @@ THEMES = {
         "success": "#34D399",
         "warning": "#F2B33D",
         "danger": "#F0616B",
-        "text": "#E8EEF9",
-        "text2": "#9AACBF",
-        "text3": "#6B7D95",
-        "sidebar": "#080D18",
-        "sidebar2": "#0C1424",
+        "text": "#F2F6FC",
+        "text2": "#9AA8BA",
+        "text3": "#687687",
+        "sidebar": "#04060A",
+        "sidebar2": "#090D14",
         "side_text": "#E8EEF9",
         "side_text2": "#93A5BD",
-        "side_active": "#13223A",
-        "prog_bg": "#16233A",
-        "ring_track": "#16223A",
-        "highlight": "#14243C",
-        "shadow": "#04070D",
+        "side_active": "#101823",
+        "prog_bg": "#141A24",
+        "ring_track": "#141A24",
+        "highlight": "#121923",
+        "shadow": "#000000",
         "on_accent": "#04121B",
-        "scrim": "#070B14",
-        "toast": "#121C2E",
-        "track": "#16223A",
+        "scrim": "#05070B",
+        "toast": "#11161F",
+        "track": "#141A24",
     },
     "light": {
         "name": "light",
@@ -361,7 +361,7 @@ class DataManager:
         settings.setdefault("daily_quote_date", "")
         settings.setdefault("daily_quote_idx", 0)
         settings.setdefault("perfect_day_awarded", "")
-        settings.setdefault("window_alpha", 0.96)
+        settings.setdefault("window_alpha", 0.93)
         settings.setdefault("animations", True)
 
         for index, task in enumerate(data["tasks"]):
@@ -409,7 +409,7 @@ class DataManager:
                 "daily_quote_date": "",
                 "daily_quote_idx": 0,
                 "perfect_day_awarded": "",
-                "window_alpha": 0.96,
+                "window_alpha": 0.93,
                 "animations": True,
             },
         }
@@ -1103,19 +1103,19 @@ DEFAULT_TASKS = [
 THEMES = {
     "dark": {
         "name": "dark",
-        "bg": "#070B14",
-        "bg_alt": "#090E19",
-        "surface": "#0C1322",
-        "surface2": "#111A2B",
-        "surface3": "#16223A",
-        "card": "#0C1322",
-        "card2": "#101A2C",
-        "border": "#1B2942",
-        "border_hi": "#2B3D5C",
+        "bg": "#05070B",
+        "bg_alt": "#070A0F",
+        "surface": "#0A0D13",
+        "surface2": "#0E1219",
+        "surface3": "#141A24",
+        "card": "#0A0D13",
+        "card2": "#0D1118",
+        "border": "#191F2A",
+        "border_hi": "#2A3444",
         "primary": "#2E8BFF",
         "primary_l": "#7FB4FF",
         "primary_d": "#1A4FA8",
-        "primary_soft": "#10213B",
+        "primary_soft": "#0B1730",
         "cyan": "#22D3EE",
         "cyan_soft": "#0C2B36",
         "purple": "#8B5CF6",
@@ -1125,22 +1125,22 @@ THEMES = {
         "success": "#34D399",
         "warning": "#F2B33D",
         "danger": "#F0616B",
-        "text": "#E8EEF9",
-        "text2": "#9AACBF",
-        "text3": "#6B7D95",
-        "sidebar": "#080D18",
-        "sidebar2": "#0C1424",
+        "text": "#F2F6FC",
+        "text2": "#9AA8BA",
+        "text3": "#687687",
+        "sidebar": "#04060A",
+        "sidebar2": "#090D14",
         "side_text": "#E8EEF9",
         "side_text2": "#93A5BD",
-        "side_active": "#13223A",
-        "prog_bg": "#16233A",
-        "ring_track": "#16223A",
-        "highlight": "#14243C",
-        "shadow": "#04070D",
+        "side_active": "#101823",
+        "prog_bg": "#141A24",
+        "ring_track": "#141A24",
+        "highlight": "#121923",
+        "shadow": "#000000",
         "on_accent": "#04121B",
-        "scrim": "#070B14",
-        "toast": "#121C2E",
-        "track": "#16223A",
+        "scrim": "#05070B",
+        "toast": "#11161F",
+        "track": "#141A24",
     },
     "light": {
         "name": "light",
@@ -1776,7 +1776,15 @@ class IconButton(tk.Canvas):
 
 
 class CheckCircle(tk.Canvas):
-    """Habit completion control: rounded square that fills when done."""
+    """Habit completion control: a rounded square that fills and strokes its tick.
+
+    The tick is a two-segment path revealed by its own arc length, so completion
+    lands as a drawn check instead of an icon appearing in one frame.  A single
+    expanding ripple carries the "logged" feeling without any sustained glow.
+    """
+
+    CHECK_MS = 165
+    RIPPLE_MS = 280
 
     def __init__(self, parent, app, checked=False, color=None, command=None,
                  size=26, bg=None):
@@ -1787,6 +1795,8 @@ class CheckCircle(tk.Canvas):
         self._command = command
         self._size = size
         self._hover = False
+        self._progress = 1.0 if self._checked else 0.0
+        self._job = None
         self._host = bg or parent.cget("bg")
         super().__init__(parent, width=size, height=size, bg=self._host,
                          highlightthickness=0, bd=0, cursor="hand2")
@@ -1795,40 +1805,138 @@ class CheckCircle(tk.Canvas):
         self.bind("<Button-1>", self._on_click)
         self._draw()
 
+    # -- geometry ------------------------------------------------------
+    @staticmethod
+    def _lerp(a, b, t):
+        return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+    def _tick_points(self):
+        size = self._size
+        return ((0.29 * size, 0.53 * size), (0.44 * size, 0.68 * size),
+                (0.72 * size, 0.36 * size))
+
+    # -- painting ------------------------------------------------------
+    def _draw(self, scale=1.0, progress=None, ripple=None):
+        self.delete("all")
+        size = self._size
+        centre = size / 2
+        inset = 1.5
+        p = self._progress if progress is None else progress
+
+        if ripple:
+            spread = size * 0.55 * ripple
+            tint = mix(self._host, self._color, max(0.0, 1.0 - ripple))
+            self.create_oval(centre - spread, centre - spread, centre + spread,
+                             centre + spread, outline=tint, width=1.4)
+
+        filled = self._checked
+        half = (centre - inset) * scale
+        outline = None
+        if not filled:
+            outline = self.c["primary"] if self._hover else self.c["border_hi"]
+        rrect(self, centre - half, centre - half, centre + half, centre + half,
+              size * 0.30 * scale, fill=self._color if filled else None,
+              outline=outline, width=1.6)
+
+        if filled and p > 0.001:
+            p0, p1, p2 = self._tick_points()
+            l1 = math.dist(p0, p1)
+            l2 = math.dist(p1, p2)
+            target = p * (l1 + l2)
+            if target <= l1:
+                path = (p0, self._lerp(p0, p1, target / l1 if l1 else 0.0))
+            else:
+                path = (p0, p1, self._lerp(p1, p2, (target - l1) / l2 if l2 else 1.0))
+            flat = []
+            for point in path:
+                flat.extend(point)
+            self.create_line(*flat, fill=readable_on(self._color), width=2.4,
+                             capstyle="round", joinstyle="round")
+
+    # -- interaction ---------------------------------------------------
     def _set_hover(self, hover):
         self._hover = hover
         self._draw()
 
-    def _draw(self, scale=1.0, fill=None):
-        self.delete("all")
-        size = self._size
-        inset = 1.5
-        if fill is None:
-            fill = self._color if self._checked else None
-        outline = None
-        if not self._checked:
-            outline = self.c["primary"] if self._hover else self.c["border_hi"]
-        box = size / 2 - (size / 2 - inset) * scale
-        rrect(self, box, box, size - box, size - box, (size * 0.30) * scale,
-              fill=fill, outline=outline, width=1.6)
-        if self._checked:
-            draw_icon(self, "check", size / 2, size / 2, size=size * 0.60,
-                      color=readable_on(fill or self._color), width=2.4)
-
-    def _on_click(self, _event):
+    def _on_click(self, _event=None):
         if self._command:
             self._command()
 
+    def _cancel(self):
+        if self._job is not None:
+            try:
+                self.after_cancel(self._job)
+            except tk.TclError:
+                pass
+            self._job = None
+
+    def _animate_in(self):
+        self._cancel()
+        started = time.perf_counter()
+        span = self.RIPPLE_MS / 1000.0
+
+        def step():
+            self._job = None
+            if not self.winfo_exists():
+                return
+            t = min(1.0, (time.perf_counter() - started) / span)
+            tick = max(0.0, min(1.0, (t - 0.18) / 0.72))
+            scale = 1.0 + 0.14 * math.sin(math.pi * min(1.0, t / 0.45))
+            self._progress = tick
+            if t < 1.0:
+                self._draw(scale=scale, progress=tick, ripple=t)
+                self._job = self.after(16, step)
+            else:
+                self._progress = 1.0
+                self._draw()
+
+        step()
+
+    def _animate_out(self):
+        self._cancel()
+        started = time.perf_counter()
+        span = 0.11
+
+        def step():
+            self._job = None
+            if not self.winfo_exists():
+                return
+            t = min(1.0, (time.perf_counter() - started) / span)
+            if t < 1.0:
+                self._draw(scale=1.0 - 0.10 * t, progress=1.0 - t)
+                self._job = self.after(16, step)
+            else:
+                self._checked = False
+                self._progress = 0.0
+                self._draw()
+
+        step()
+
     def set_checked(self, checked, animate=False):
+        checked = bool(checked)
         was = self._checked
-        self._checked = bool(checked)
+        if checked == was and self._job is not None:
+            # the dashboard refreshes rows right after a toggle; don't cut the tick off
+            return
+        if checked and not was:
+            self._checked = True
+            self._progress = 0.0
+            self._animate_in()
+            return
+        if animate and was and not checked:
+            self._animate_out()
+            return
+        self._cancel()
+        self._checked = checked
+        self._progress = 1.0 if checked else 0.0
         self._draw()
-        if animate and self._checked and not was:
-            self._pop()
 
     def _pop(self):
-        for index, scale in enumerate((1.16, 1.08, 1.0)):
-            self.after(index * 45, lambda s=scale: self.winfo_exists() and self._draw(s))
+        """Compatibility shim: replay the fill-and-tick motion."""
+        self._checked = True
+        self._progress = 0.0
+        self._animate_in()
+
 
 # ==================================================================
 # DATA VISUALS
@@ -4875,6 +4983,51 @@ class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
             "Calendar": self._view_calendar,
             "Settings": self._view_settings,
         }[view_name]()
+
+        for child in list(self.content.winfo_children()):
+            self._transition_page(child)
+
+    def _transition_page(self, page):
+        """Slide a freshly built page up into place behind a short HUD sweep."""
+        if not self.animations_on():
+            return
+        try:
+            page.pack_forget()
+            page.place(x=0, y=18, relwidth=1, relheight=1)
+        except tk.TclError:
+            return
+        sweep = tk.Canvas(self.content, bg=self.c["bg"], highlightthickness=0, bd=0)
+        sweep.place(x=0, y=0, relwidth=1, height=2)
+        started = time.perf_counter()
+        span = 0.22
+
+        def step():
+            try:
+                if not page.winfo_exists():
+                    return
+                t = min(1.0, (time.perf_counter() - started) / span)
+                eased = 1 - (1 - t) ** 3
+                page.place_configure(y=int(round(18 * (1 - eased))))
+                width = max(1, self.content.winfo_width())
+                head = int(width * eased)
+                sweep.delete("all")
+                for index in range(16):
+                    x = head - index * 7
+                    if x < 0 or x > width:
+                        continue
+                    fade = max(0.0, 0.55 * (1 - index / 16.0))
+                    sweep.create_line(x, 1, x + 10, 1, width=2,
+                                      fill=mix(self.c["bg"], self.c["cyan"], fade))
+                if t < 1.0:
+                    self.root.after(16, step)
+                else:
+                    page.place_forget()
+                    page.pack(fill="both", expand=True)
+                    sweep.destroy()
+            except tk.TclError:
+                pass
+
+        step()
 
     def _refresh(self):
         self._show(self._active_view or "Dashboard")
