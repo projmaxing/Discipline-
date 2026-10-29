@@ -5,16 +5,18 @@
 |      No accounts. No internet. No cloud. 100% yours.             |
 +------------------------------------------------------------------+
 |  Requirements:  Python 3.8+  (tkinter is built-in)               |
-|  Dependencies:  none - all charts are drawn with tkinter         |
+|  Dependencies:  none - every chart is drawn with tkinter         |
 |                                                                  |
 |  Run:   python habit.py                                          |
 |  Data:  ~/.habitflow/data.json  (fully local)                    |
 +------------------------------------------------------------------+
 
-v2.0 "Command Center" - visual redesign of the v1 HabitFlow tracker.
-Every data structure, storage path and business rule from v1 is
-preserved; this file changes how the app looks and feels, not what
-it stores.
+v2.1 "Command Center" - a second, deeper design pass on the v2 UI.
+
+Everything the app stores and calculates is unchanged: the same
+~/.habitflow/data.json format, the same scheduling rules, the same
+streak and XP maths.  This file changes only how the app looks and
+how it is laid out.
 """
 
 # ==================================================================
@@ -22,6 +24,7 @@ it stores.
 # ==================================================================
 import calendar as cal_module
 import json
+import math
 import os
 import random
 import shutil
@@ -38,7 +41,7 @@ from tkinter import filedialog, messagebox, ttk
 # CONSTANTS
 # ==================================================================
 APP_NAME = "HabitFlow"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 DATA_DIR = os.path.join(os.path.expanduser("~"), ".habitflow")
 DATA_FILE = os.path.join(DATA_DIR, "data.json")
 BACKUP_DIR = os.path.join(DATA_DIR, "backups")
@@ -60,22 +63,29 @@ LEVEL_NAMES = [
     "Ascended",
 ]
 
-# -- Category -> accent colour --------------------------------------
+# -- Category -> accent colour (desaturated for dark surfaces) ------
 CATEGORIES = {
-    "Health": "#34D399",
-    "Study": "#60A5FA",
-    "Fitness": "#FB923C",
+    "Health": "#3ED598",
+    "Study": "#5B9CFF",
+    "Fitness": "#FF9A5B",
     "Personal": "#A78BFA",
-    "Work": "#FBBF24",
+    "Work": "#F5C451",
     "Social": "#F472B6",
-    "Sleep": "#818CF8",
-    "Other": "#7E8CA0",
+    "Sleep": "#7C93F5",
+    "Other": "#8394AB",
 }
 CAT_LIST = list(CATEGORIES.keys())
 
 RECURRENCE_OPTIONS = ["Daily", "Weekdays", "Weekends", "Weekly", "Monthly", "Custom Days"]
 WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 WEEKDAY_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+# -- Layout tokens: one spacing scale for the whole application -----
+PAGE_PAD = 32          # page gutter
+SECTION_GAP = 18       # vertical rhythm between sections
+CARD_RADIUS = 18
+CARD_PAD = (20, 18)
+
 
 # -- Motivational quotes (unchanged) --------------------------------
 QUOTES = [
@@ -114,85 +124,91 @@ DEFAULT_TASKS = [
 # ==================================================================
 # COLOUR THEMES
 # ==================================================================
-# Near-black + charcoal surfaces, neon blue primary, restrained
-# purple secondary. The sidebar stays dark in both themes so the app
-# keeps its "command center" identity even in light mode.
+# Midnight-blue / deep charcoal surfaces, one electric blue accent,
+# cyan used sparingly for "live" information, green for completion.
+# The sidebar stays dark in both themes so the app keeps its identity.
 THEMES = {
     "dark": {
         "name": "dark",
-        "bg": "#070A12",
-        "bg_alt": "#080D17",
-        "surface": "#0E1522",
-        "surface2": "#131C2B",
-        "surface3": "#1A2436",
-        "card": "#0E1522",
-        "card2": "#111A29",
-        "border": "#1B2637",
-        "border_hi": "#27384F",
-        "primary": "#3D8BFF",
-        "primary_l": "#7FB2FF",
-        "primary_d": "#1E4FA8",
-        "primary_soft": "#122340",
+        "bg": "#070B14",
+        "bg_alt": "#090E19",
+        "surface": "#0C1322",
+        "surface2": "#111A2B",
+        "surface3": "#16223A",
+        "card": "#0C1322",
+        "card2": "#101A2C",
+        "border": "#1B2942",
+        "border_hi": "#2B3D5C",
+        "primary": "#2E8BFF",
+        "primary_l": "#7FB4FF",
+        "primary_d": "#1A4FA8",
+        "primary_soft": "#10213B",
+        "cyan": "#22D3EE",
+        "cyan_soft": "#0C2B36",
         "purple": "#8B5CF6",
         "purple_l": "#B79CFF",
-        "purple_soft": "#1A1533",
+        "purple_soft": "#191334",
         "accent": "#22D3A5",
-        "success": "#2BD48A",
-        "warning": "#F5B84B",
+        "success": "#34D399",
+        "warning": "#F2B33D",
         "danger": "#F0616B",
-        "text": "#E9EFFA",
-        "text2": "#93A4BC",
-        "text3": "#5B6B82",
-        "sidebar": "#080D16",
-        "sidebar2": "#0B1220",
-        "side_text": "#E9EFFA",
-        "side_text2": "#8EA0B9",
-        "side_active": "#122035",
-        "prog_bg": "#182233",
-        "ring_track": "#182233",
-        "highlight": "#16233A",
-        "shadow": "#04060C",
+        "text": "#E8EEF9",
+        "text2": "#9AACBF",
+        "text3": "#6B7D95",
+        "sidebar": "#080D18",
+        "sidebar2": "#0C1424",
+        "side_text": "#E8EEF9",
+        "side_text2": "#93A5BD",
+        "side_active": "#13223A",
+        "prog_bg": "#16233A",
+        "ring_track": "#16223A",
+        "highlight": "#14243C",
+        "shadow": "#04070D",
         "on_accent": "#04121B",
-        "scrim": "#070A12",
-        "toast": "#101A2B",
+        "scrim": "#070B14",
+        "toast": "#121C2E",
+        "track": "#16223A",
     },
     "light": {
         "name": "light",
-        "bg": "#F1F5FC",
-        "bg_alt": "#E9EFF9",
+        "bg": "#EEF3FB",
+        "bg_alt": "#E7EEF9",
         "surface": "#FFFFFF",
-        "surface2": "#F5F8FE",
-        "surface3": "#E8EFFA",
+        "surface2": "#F4F8FF",
+        "surface3": "#E6EEFA",
         "card": "#FFFFFF",
         "card2": "#F8FAFF",
-        "border": "#DCE5F3",
-        "border_hi": "#C3D2E8",
+        "border": "#DBE5F4",
+        "border_hi": "#C2D2EA",
         "primary": "#2563EB",
         "primary_l": "#1D4ED8",
         "primary_d": "#1E40AF",
-        "primary_soft": "#E6EEFE",
+        "primary_soft": "#E7EFFE",
+        "cyan": "#0E7490",
+        "cyan_soft": "#E0F5FA",
         "purple": "#7C3AED",
         "purple_l": "#6D28D9",
-        "purple_soft": "#EFE9FE",
+        "purple_soft": "#F0E9FE",
         "accent": "#0E9F7E",
-        "success": "#16A34A",
-        "warning": "#C2820B",
-        "danger": "#DC2626",
-        "text": "#0C1524",
-        "text2": "#4C5D74",
-        "text3": "#8394AB",
-        "sidebar": "#0B1220",
-        "sidebar2": "#101A2B",
-        "side_text": "#E9EFFA",
-        "side_text2": "#93A4BC",
-        "side_active": "#18263C",
-        "prog_bg": "#E4ECF9",
-        "ring_track": "#E4ECF9",
+        "success": "#12915C",
+        "warning": "#B87503",
+        "danger": "#D93036",
+        "text": "#0B1526",
+        "text2": "#4A5B72",
+        "text3": "#7C8CA3",
+        "sidebar": "#0A1120",
+        "sidebar2": "#0F1A2C",
+        "side_text": "#E8EEF9",
+        "side_text2": "#93A5BD",
+        "side_active": "#16243A",
+        "prog_bg": "#E3ECFA",
+        "ring_track": "#E3ECFA",
         "highlight": "#EDF3FE",
-        "shadow": "#D7E1F0",
+        "shadow": "#D7E2F2",
         "on_accent": "#04121B",
-        "scrim": "#F1F5FC",
+        "scrim": "#EEF3FB",
         "toast": "#FFFFFF",
+        "track": "#E3ECFA",
     },
 }
 
@@ -237,21 +253,30 @@ def readable_on(color: str) -> str:
     return "#08111E" if luminance > 0.62 else "#FFFFFF"
 
 
+def cat_color(category: str, theme) -> str:
+    """Category accent, darkened for legibility on the light theme."""
+    base = CATEGORIES.get(category, CATEGORIES["Other"])
+    if theme.get("name") == "light":
+        return mix(base, "#0B1526", 0.34)
+    return base
+
+
 # ==================================================================
 # TYPOGRAPHY
 # ==================================================================
 FONT_STACK = [
     "Segoe UI Variable Text",
     "Segoe UI",
+    "Inter",
     "SF Pro Text",
     "Helvetica Neue",
-    "Inter",
     "Ubuntu",
     "Noto Sans",
     "DejaVu Sans",
     "Arial",
 ]
-MONO_STACK = ["Cascadia Mono", "Consolas", "SF Mono", "JetBrains Mono", "DejaVu Sans Mono", "Courier New"]
+MONO_STACK = ["Cascadia Mono", "Consolas", "SF Mono", "JetBrains Mono",
+              "DejaVu Sans Mono", "Courier New"]
 
 FONT_FAMILY = "Segoe UI"
 MONO_FAMILY = "Consolas"
@@ -275,13 +300,15 @@ def init_fonts(root):
     return FONT_FAMILY, MONO_FAMILY
 
 
-def f(size=11, weight="normal", slant="roman"):
+def f(size=12, weight="normal", slant="roman"):
     """Shorthand for a UI font tuple."""
     return (FONT_FAMILY, size, weight, slant)
 
 
 def mono(size=10, weight="normal"):
     return (MONO_FAMILY, size, weight)
+
+
 # ==================================================================
 # DATA MANAGER - all persistence and business logic
 # ==================================================================
@@ -723,6 +750,8 @@ class DataManager:
         self.backup()
         self.data = self._fresh_data()
         self.save()
+
+
 # ==================================================================
 # DRAWING PRIMITIVES
 # ==================================================================
@@ -938,25 +967,372 @@ def draw_icon(canvas, name, cx, cy, size=18, color="#FFFFFF", width=1.7, tags=("
         circle(12, 12, 2.4, filled=True, w=1)
 
 
+#!/usr/bin/env python3
+"""
++------------------------------------------------------------------+
+|           HabitFlow - Personal Offline Habit Tracker             |
+|      No accounts. No internet. No cloud. 100% yours.             |
++------------------------------------------------------------------+
+|  Requirements:  Python 3.8+  (tkinter is built-in)               |
+|  Dependencies:  none - every chart is drawn with tkinter         |
+|                                                                  |
+|  Run:   python habit.py                                          |
+|  Data:  ~/.habitflow/data.json  (fully local)                    |
++------------------------------------------------------------------+
+
+v2.1 "Command Center" - a second, deeper design pass on the v2 UI.
+
+Everything the app stores and calculates is unchanged: the same
+~/.habitflow/data.json format, the same scheduling rules, the same
+streak and XP maths.  This file changes only how the app looks and
+how it is laid out.
+"""
+
+# ==================================================================
+# IMPORTS
+# ==================================================================
+import calendar as cal_module
+import json
+import math
+import os
+import random
+import shutil
+import sys
+import tempfile
+import tkinter as tk
+import tkinter.font as tkfont
+import uuid
+from datetime import date, datetime, timedelta
+from tkinter import filedialog, messagebox, ttk
+
+
+# ==================================================================
+# CONSTANTS
+# ==================================================================
+APP_NAME = "HabitFlow"
+VERSION = "2.1.0"
+DATA_DIR = os.path.join(os.path.expanduser("~"), ".habitflow")
+DATA_FILE = os.path.join(DATA_DIR, "data.json")
+BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+
+# -- XP & levelling thresholds (unchanged from v1) -------------------
+XP_PER_TASK = 10
+XP_PERFECT_DAY = 50
+LEVELS = [0, 100, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, 99_999]
+LEVEL_NAMES = [
+    "Beginner",
+    "Apprentice",
+    "Practitioner",
+    "Adept",
+    "Expert",
+    "Master",
+    "Grandmaster",
+    "Legend",
+    "Mythic",
+    "Ascended",
+]
+
+# -- Category -> accent colour (desaturated for dark surfaces) ------
+CATEGORIES = {
+    "Health": "#3ED598",
+    "Study": "#5B9CFF",
+    "Fitness": "#FF9A5B",
+    "Personal": "#A78BFA",
+    "Work": "#F5C451",
+    "Social": "#F472B6",
+    "Sleep": "#7C93F5",
+    "Other": "#8394AB",
+}
+CAT_LIST = list(CATEGORIES.keys())
+
+RECURRENCE_OPTIONS = ["Daily", "Weekdays", "Weekends", "Weekly", "Monthly", "Custom Days"]
+WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+WEEKDAY_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+# -- Layout tokens: one spacing scale for the whole application -----
+PAGE_PAD = 32          # page gutter
+SECTION_GAP = 18       # vertical rhythm between sections
+CARD_RADIUS = 18
+CARD_PAD = (20, 18)
+
+
+# -- Motivational quotes (unchanged) --------------------------------
+QUOTES = [
+    ("We are what we repeatedly do. Excellence is not an act, but a habit.", "Aristotle"),
+    ("Discipline is the bridge between goals and accomplishment.", "Jim Rohn"),
+    ("Small daily improvements are the key to staggering long-term results.", "Robin Sharma"),
+    ("You don't rise to your goals; you fall to the level of your systems.", "James Clear"),
+    ("Motivation is what gets you started. Habit is what keeps you going.", "Jim Ryun"),
+    ("The secret of your future is hidden in your daily routine.", "Mike Murdock"),
+    ("Success is the sum of small efforts repeated day in and day out.", "Robert Collier"),
+    ("First forget inspiration. Habit is more dependable.", "Octavia Butler"),
+    ("Habits are the compound interest of self-improvement.", "James Clear"),
+    ("A year from now you may wish you had started today.", "Karen Lamb"),
+    ("The only bad workout is the one that didn't happen.", "Unknown"),
+    ("Don't count the days; make the days count.", "Muhammad Ali"),
+    ("Push yourself, because no one else is going to do it for you.", "Unknown"),
+    ("Wake up with determination. Go to bed with satisfaction.", "Unknown"),
+    ("Your future self is watching you right now through memories.", "Unknown"),
+    ("The best time to plant a tree was 20 years ago. The second best time is now.", "Chinese Proverb"),
+    ("Do something today that your future self will thank you for.", "Sean Patrick Flanery"),
+]
+
+# -- Default starter habits (unchanged) -----------------------------
+DEFAULT_TASKS = [
+    {"name": "Drink 4L of water", "category": "Health", "daily_target": "4L", "notes": "Stay hydrated throughout the day"},
+    {"name": "Revise notes", "category": "Study", "daily_target": "", "notes": "Review today's study material"},
+    {"name": "Gym / Workout", "category": "Fitness", "daily_target": "45min", "notes": ""},
+    {"name": "Social interaction", "category": "Social", "daily_target": "", "notes": "Connect meaningfully with someone"},
+    {"name": "Learn something new", "category": "Study", "daily_target": "", "notes": "Read, watch, or explore"},
+    {"name": "Sleep 7-8 hours", "category": "Sleep", "daily_target": "7-8h", "notes": "Consistent sleep schedule"},
+    {"name": "Deep work (2 hours)", "category": "Work", "daily_target": "2h", "notes": "No distractions, fully focused"},
+    {"name": "Daily reflection", "category": "Personal", "daily_target": "10min", "notes": "Journal or meditate before bed"},
+]
+
+
+# ==================================================================
+# COLOUR THEMES
+# ==================================================================
+# Midnight-blue / deep charcoal surfaces, one electric blue accent,
+# cyan used sparingly for "live" information, green for completion.
+# The sidebar stays dark in both themes so the app keeps its identity.
+THEMES = {
+    "dark": {
+        "name": "dark",
+        "bg": "#070B14",
+        "bg_alt": "#090E19",
+        "surface": "#0C1322",
+        "surface2": "#111A2B",
+        "surface3": "#16223A",
+        "card": "#0C1322",
+        "card2": "#101A2C",
+        "border": "#1B2942",
+        "border_hi": "#2B3D5C",
+        "primary": "#2E8BFF",
+        "primary_l": "#7FB4FF",
+        "primary_d": "#1A4FA8",
+        "primary_soft": "#10213B",
+        "cyan": "#22D3EE",
+        "cyan_soft": "#0C2B36",
+        "purple": "#8B5CF6",
+        "purple_l": "#B79CFF",
+        "purple_soft": "#191334",
+        "accent": "#22D3A5",
+        "success": "#34D399",
+        "warning": "#F2B33D",
+        "danger": "#F0616B",
+        "text": "#E8EEF9",
+        "text2": "#9AACBF",
+        "text3": "#6B7D95",
+        "sidebar": "#080D18",
+        "sidebar2": "#0C1424",
+        "side_text": "#E8EEF9",
+        "side_text2": "#93A5BD",
+        "side_active": "#13223A",
+        "prog_bg": "#16233A",
+        "ring_track": "#16223A",
+        "highlight": "#14243C",
+        "shadow": "#04070D",
+        "on_accent": "#04121B",
+        "scrim": "#070B14",
+        "toast": "#121C2E",
+        "track": "#16223A",
+    },
+    "light": {
+        "name": "light",
+        "bg": "#EEF3FB",
+        "bg_alt": "#E7EEF9",
+        "surface": "#FFFFFF",
+        "surface2": "#F4F8FF",
+        "surface3": "#E6EEFA",
+        "card": "#FFFFFF",
+        "card2": "#F8FAFF",
+        "border": "#DBE5F4",
+        "border_hi": "#C2D2EA",
+        "primary": "#2563EB",
+        "primary_l": "#1D4ED8",
+        "primary_d": "#1E40AF",
+        "primary_soft": "#E7EFFE",
+        "cyan": "#0E7490",
+        "cyan_soft": "#E0F5FA",
+        "purple": "#7C3AED",
+        "purple_l": "#6D28D9",
+        "purple_soft": "#F0E9FE",
+        "accent": "#0E9F7E",
+        "success": "#12915C",
+        "warning": "#B87503",
+        "danger": "#D93036",
+        "text": "#0B1526",
+        "text2": "#4A5B72",
+        "text3": "#7C8CA3",
+        "sidebar": "#0A1120",
+        "sidebar2": "#0F1A2C",
+        "side_text": "#E8EEF9",
+        "side_text2": "#93A5BD",
+        "side_active": "#16243A",
+        "prog_bg": "#E3ECFA",
+        "ring_track": "#E3ECFA",
+        "highlight": "#EDF3FE",
+        "shadow": "#D7E2F2",
+        "on_accent": "#04121B",
+        "scrim": "#EEF3FB",
+        "toast": "#FFFFFF",
+        "track": "#E3ECFA",
+    },
+}
+
+
+# ==================================================================
+# COLOUR HELPERS
+# ==================================================================
+def _clamp(value, low=0, high=255):
+    return max(low, min(high, value))
+
+
+def _hex_to_rgb(color: str):
+    color = color.lstrip("#")
+    if len(color) == 3:
+        color = "".join(ch * 2 for ch in color)
+    return tuple(int(color[i : i + 2], 16) for i in (0, 2, 4))
+
+
+def _rgb_to_hex(rgb) -> str:
+    return "#%02X%02X%02X" % tuple(_clamp(int(round(c))) for c in rgb)
+
+
+def mix(color_a: str, color_b: str, t: float) -> str:
+    """Blend two hex colours (t=0 -> a, t=1 -> b)."""
+    t = max(0.0, min(1.0, t))
+    a, b = _hex_to_rgb(color_a), _hex_to_rgb(color_b)
+    return _rgb_to_hex(tuple(a[i] + (b[i] - a[i]) * t for i in range(3)))
+
+
+def shade(color: str, factor: float) -> str:
+    """Lighten (factor > 1) or darken (factor < 1) a hex colour."""
+    rgb = _hex_to_rgb(color)
+    if factor >= 1:
+        return _rgb_to_hex(tuple(c + (255 - c) * (factor - 1) for c in rgb))
+    return _rgb_to_hex(tuple(c * factor for c in rgb))
+
+
+def readable_on(color: str) -> str:
+    """Return near-black or white depending on the background luminance."""
+    r, g, b = _hex_to_rgb(color)
+    luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return "#08111E" if luminance > 0.62 else "#FFFFFF"
+
+
+def cat_color(category: str, theme) -> str:
+    """Category accent, darkened for legibility on the light theme."""
+    base = CATEGORIES.get(category, CATEGORIES["Other"])
+    if theme.get("name") == "light":
+        return mix(base, "#0B1526", 0.34)
+    return base
+
+
+# ==================================================================
+# TYPOGRAPHY
+# ==================================================================
+FONT_STACK = [
+    "Segoe UI Variable Text",
+    "Segoe UI",
+    "Inter",
+    "SF Pro Text",
+    "Helvetica Neue",
+    "Ubuntu",
+    "Noto Sans",
+    "DejaVu Sans",
+    "Arial",
+]
+MONO_STACK = ["Cascadia Mono", "Consolas", "SF Mono", "JetBrains Mono",
+              "DejaVu Sans Mono", "Courier New"]
+
+FONT_FAMILY = "Segoe UI"
+MONO_FAMILY = "Consolas"
+
+
+def init_fonts(root):
+    """Pick the best available UI font for this platform."""
+    global FONT_FAMILY, MONO_FAMILY
+    try:
+        available = set(tkfont.families(root))
+    except Exception:
+        available = set()
+    for family in FONT_STACK:
+        if family in available:
+            FONT_FAMILY = family
+            break
+    for family in MONO_STACK:
+        if family in available:
+            MONO_FAMILY = family
+            break
+    return FONT_FAMILY, MONO_FAMILY
+
+
+def f(size=12, weight="normal", slant="roman"):
+    """Shorthand for a UI font tuple."""
+    return (FONT_FAMILY, size, weight, slant)
+
+
+def mono(size=10, weight="normal"):
+    return (MONO_FAMILY, size, weight)
+
+# ==================================================================
+# SMALL HELPERS
+# ==================================================================
+def bind_tree(widget, sequence, callback, skip=("Canvas",)):
+    """Bind an event on a widget and all of its text descendants."""
+    widget.bind(sequence, callback)
+    for child in widget.winfo_children():
+        try:
+            if child.winfo_class() in skip:
+                continue
+        except tk.TclError:
+            continue
+        bind_tree(child, sequence, callback, skip)
+
+
+def elide(text, font, max_width):
+    """Trim a string with an ellipsis so it fits `max_width` pixels."""
+    if not text:
+        return ""
+    try:
+        width = font.measure(text)
+    except tk.TclError:
+        return text
+    if width <= max_width:
+        return text
+    trimmed = text
+    while trimmed and font.measure(trimmed + "…") > max_width:
+        trimmed = trimmed[:-1]
+    return (trimmed.rstrip() + "…") if trimmed else "…"
+
+
+def hairline(parent, app, color=None, pady=(0, 0), padx=0):
+    line = tk.Frame(parent, bg=color or app.c["border"], height=1)
+    line.pack(fill="x", padx=padx, pady=pady)
+    return line
+
+
 # ==================================================================
 # SCROLLING
 # ==================================================================
 class SlimScrollbar(tk.Canvas):
-    """A 6px rounded scrollbar that replaces the dated native one."""
+    """A slim rounded scrollbar that replaces the dated native one."""
 
     def __init__(self, parent, bg, track, thumb, command, width=8):
-        super().__init__(parent, width=width, bg=bg, highlightthickness=0, bd=0, cursor="arrow")
+        super().__init__(parent, width=width, bg=bg, highlightthickness=0, bd=0,
+                         cursor="arrow")
         self._track = track
         self._thumb = thumb
         self._command = command
         self._first = 0.0
         self._last = 1.0
         self._drag_offset = None
-        self.bind("<Configure>", lambda _e: self._draw())
+        self.bind("<Configure>", lambda _e=None: self._draw())
         self.bind("<Button-1>", self._on_press)
         self.bind("<B1-Motion>", self._on_drag)
-        self.bind("<ButtonRelease-1>", lambda _e: setattr(self, "_drag_offset", None))
-        self.bind("<Enter>", lambda _e: self.configure(bg=bg))
+        self.bind("<ButtonRelease-1>", lambda _e=None: setattr(self, "_drag_offset", None))
 
     def set(self, first, last):
         self._first, self._last = float(first), float(last)
@@ -972,7 +1348,7 @@ class SlimScrollbar(tk.Canvas):
             return
         rrect(self, 0, 0, width, height, width / 2, fill=self._track)
         top = self._first * height
-        bottom = max(self._last * height, top + 26)
+        bottom = max(self._last * height, top + 28)
         rrect(self, 1, top + 1, width - 1, min(bottom, height) - 1,
               (width - 2) / 2, fill=self._thumb)
 
@@ -991,16 +1367,18 @@ class SlimScrollbar(tk.Canvas):
 
 
 class ScrollableFrame(tk.Frame):
-    """Vertically scrollable container with mousewheel + slim scrollbar."""
+    """Vertically scrollable page container with mousewheel + slim bar."""
 
     def __init__(self, parent, bg, padding=0, track=None, thumb=None, **kwargs):
         super().__init__(parent, bg=bg, **kwargs)
         self.canvas = tk.Canvas(self, bg=bg, highlightthickness=0, bd=0)
         self.inner = tk.Frame(self.canvas, bg=bg)
-        self._win = self.canvas.create_window((padding, padding), window=self.inner, anchor="nw")
+        self._win = self.canvas.create_window((padding, padding), window=self.inner,
+                                              anchor="nw")
         self._padding = padding
-        self.scrollbar = SlimScrollbar(self, bg, track or shade(bg, 1.25),
-                                       thumb or shade(bg, 2.4), self._on_scroll_command)
+        self.scrollbar = SlimScrollbar(self, bg, track or mix(bg, "#FFFFFF", 0.05),
+                                       thumb or mix(bg, "#FFFFFF", 0.16),
+                                       self._on_scroll_command)
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y", padx=(2, 0))
@@ -1031,7 +1409,7 @@ class ScrollableFrame(tk.Frame):
         self.canvas.unbind_all("<Button-5>")
 
     def _on_wheel(self, event):
-        delta = -1 * int(event.delta / 120) if abs(event.delta) >= 120 else (-1 if event.delta > 0 else 1)
+        delta = int(-event.delta / 120) if abs(event.delta) >= 120 else (-1 if event.delta > 0 else 1)
         self.canvas.yview_scroll(delta, "units")
 
     def _on_wheel_up(self, _event):
@@ -1045,233 +1423,252 @@ class ScrollableFrame(tk.Frame):
 
 
 # ==================================================================
-# CARD - rounded, bordered surface with an embedded content frame
+# CARD
 # ==================================================================
 class Card(tk.Frame):
-    """A rounded glass-style card whose height follows its content."""
+    """Rounded surface that hugs its content.
 
-    def __init__(self, parent, app, radius=16, padding=(18, 16), fill=None,
-                 border=None, glow=False, height=None, bg=None, accent=None):
+    The background (fill, hairline border, optional accent stripe) is a
+    canvas *placed* behind a normally packed content frame.  Because the
+    canvas never takes part in geometry negotiation, a card's requested
+    height is exactly its content height - no measurement races, so
+    nested cards can never be clipped.
+    """
+
+    def __init__(self, parent, app, radius=CARD_RADIUS, pad=CARD_PAD, fill=None,
+                 border=None, accent=None, bg=None, hoverable=False):
         self.app = app
         self.c = app.c
         self._radius = radius
-        self._pad_x, self._pad_y = padding
         self._fill = fill or self.c["card"]
-        self._border = border or self.c["border"]
-        self._glow = glow
+        self._base_border = border or self.c["border"]
+        self._border = self._base_border
         self._accent = accent
-        self._fixed_height = height
-        self._hover_glow = None
+        self._hoverable = hoverable
+        self._hover = False
+        self._outer_bg = bg or parent.cget("bg")
 
-        super().__init__(parent, bg=bg or parent.cget("bg"), highlightthickness=0, bd=0)
-        self.canvas = tk.Canvas(self, bg=bg or parent.cget("bg"), highlightthickness=0, bd=0,
-                                height=height or 40)
-        self.canvas.pack(fill="both", expand=True)
-        self.body = tk.Frame(self.canvas, bg=self._fill)
-        self._win = self.canvas.create_window(self._pad_x, self._pad_y,
-                                              window=self.body, anchor="nw")
-        self.canvas.bind("<Configure>", self._on_canvas_configure)
-        self.body.bind("<Configure>", self._on_body_configure)
-        self.bind("<Destroy>", self._on_destroy)
+        super().__init__(parent, bg=self._outer_bg, highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(self, bg=self._outer_bg, highlightthickness=0, bd=0)
+        self.canvas.place(x=0, y=0, relwidth=1, relheight=1)
+        self.body = tk.Frame(self, bg=self._fill)
+        self.body.pack(fill="both", expand=True, padx=pad[0], pady=pad[1])
+        # keep the painted background behind the content frame
+        self.tk.call("lower", self.canvas._w)
+        self.canvas.bind("<Configure>", lambda _e=None: self._paint())
+        if hoverable:
+            bind_tree(self, "<Enter>", self._on_enter, skip=("Canvas",))
+            bind_tree(self, "<Leave>", self._on_leave, skip=("Canvas",))
 
-    def _on_destroy(self, event):
-        if event.widget is self:
-            self._hover_glow = None
-
-    def _on_body_configure(self, _event=None):
-        if self._fixed_height:
+    # -- painting ----------------------------------------------------
+    def _paint(self):
+        canvas = self.canvas
+        canvas.delete("bg")
+        width = canvas.winfo_width()
+        height = canvas.winfo_height()
+        if width < 4 or height < 4:
             return
-        try:
-            needed = self.body.winfo_reqheight() + self._pad_y * 2
-        except tk.TclError:
-            return
-        if abs(int(self.canvas.cget("height")) - needed) > 1:
-            self.canvas.configure(height=needed)
-
-    def _on_canvas_configure(self, event):
-        self._draw(event.width, event.height)
-        self.canvas.itemconfigure(self._win, width=max(1, event.width - self._pad_x * 2))
-
-    def _draw(self, width, height, glow_color=None):
-        self.canvas.delete("card_bg")
-        if width <= 2 or height <= 2:
-            return
-        border = glow_color or self._border
-        if glow_color is None and self._glow:
-            border = mix(self._border, self.c["primary"], 0.35)
-        rrect(self.canvas, 0.5, 0.5, width - 0.5, height - 0.5, self._radius,
-              fill=self._fill, tags=("card_bg",))
-        rrect(self.canvas, 0.5, 0.5, width - 0.5, height - 0.5, self._radius,
-              outline=border, width=1, tags=("card_bg",))
+        rrect(canvas, 0.5, 0.5, width - 0.5, height - 0.5, self._radius,
+              fill=self._fill, tags=("bg",))
+        rrect(canvas, 0.5, 0.5, width - 0.5, height - 0.5, self._radius,
+              outline=self._border, width=1, tags=("bg",))
         if self._accent:
-            rrect(self.canvas, 0.5, height * 0.22, 3.5, height * 0.78, 1.5,
-                  fill=self._accent, tags=("card_bg",))
-        self.canvas.tag_lower("card_bg")
-
-    def set_glow(self, active: bool):
-        """Subtle accent border used for hover / completion feedback."""
-        try:
-            width = self.canvas.winfo_width()
-            height = self.canvas.winfo_height()
-        except tk.TclError:
-            return
-        self._draw(width, height, mix(self._border, self.c["primary"], 0.55) if active else None)
+            inset = self._radius * 0.85
+            rrect(canvas, 0.5, inset, 3.5, height - inset, 1.5,
+                  fill=self._accent, tags=("bg",))
 
     def set_accent(self, color):
+        if color == self._accent:
+            return
         self._accent = color
+        self._paint()
+
+    def set_border(self, color):
+        if color == self._border:
+            return
+        self._border = color
+        self._paint()
+
+    # -- hover -------------------------------------------------------
+    def _on_enter(self, _event=None):
+        if self._hover or not self._hoverable:
+            return
+        self._hover = True
+        self.set_border(mix(self._base_border, self.c["primary"], 0.45))
+
+    def _on_leave(self, _event=None):
+        if not self._hoverable:
+            return
+        self.after(60, self._check_leave)
+
+    def _check_leave(self):
         try:
-            self._draw(self.canvas.winfo_width(), self.canvas.winfo_height())
-        except tk.TclError:
-            pass
+            under = self.app.root.winfo_containing(*self.app.root.winfo_pointerxy())
+        except (tk.TclError, KeyError):
+            under = None
+        widget = under
+        while widget is not None:
+            if widget is self:
+                return
+            widget = getattr(widget, "master", None)
+        self._hover = False
+        self.set_border(self._base_border)
 
 
-class Chip(tk.Canvas):
-    """Small rounded label used for categories and metadata."""
-
-    def __init__(self, parent, app, text, color=None, bg=None, filled=True,
-                 font_size=8, height=20, radius=7, fg=None):
+# ==================================================================
+# PILL - small rounded label for metadata
+# ==================================================================
+class Pill(tk.Canvas):
+    def __init__(self, parent, app, text, color=None, bg=None, dot=False, icon=None,
+                 filled=False, size=9, height=22, padx=9):
         self.c = app.c
-        color = color or self.c["surface3"]
-        bg = bg or parent.cget("bg")
-        font = (FONT_FAMILY, font_size, "bold")
-        text_width = tkfont.Font(font=font).measure(text)
-        width = text_width + 16
-        super().__init__(parent, width=width, height=height, bg=bg, highlightthickness=0, bd=0)
-        self._draw(width, height, radius, color, filled, fg)
-        self.create_text(width / 2, height / 2 + 0.5, text=text, font=font,
-                         fill=fg or (readable_on(color) if filled else color))
+        color = color or self.c["text2"]
+        host = bg or parent.cget("bg")
+        weight = "bold"
+        font = (FONT_FAMILY, size, weight)
+        measure = tkfont.Font(font=font)
+        leading = 0
+        if dot:
+            leading += 11
+        if icon:
+            leading += 17
+        width = int(measure.measure(text) + padx * 2 + leading)
+        super().__init__(parent, width=width, height=height, bg=host,
+                         highlightthickness=0, bd=0)
+        fill = color if filled else mix(color, host, 0.86)
+        fg = readable_on(color) if filled else color
+        rrect(self, 0, 0, width, height, height / 2, fill=fill)
+        x = padx
+        if dot:
+            cy = height / 2
+            self.create_oval(x - 1, cy - 3.5, x + 6, cy + 3.5, fill=fg, outline="")
+            x += 11
+        if icon:
+            draw_icon(self, icon, x + 6, height / 2, size=13, color=fg, width=1.7)
+            x += 17
+        self.create_text(x, height / 2 + 0.5, text=text, anchor="w", font=font, fill=fg)
 
-    def _draw(self, width, height, radius, color, filled, fg):
-        if filled:
-            rrect(self, 0, 0, width, height, radius, fill=color)
-        else:
-            rrect(self, 0.5, 0.5, width - 0.5, height - 0.5, radius,
-                  outline=color, width=1)
 
-
-def divider(parent, app, padx=0, pady=0, color=None):
-    line = tk.Frame(parent, bg=color or app.c["border"], height=1)
-    line.pack(fill="x", padx=padx, pady=pady)
-    return line
 # ==================================================================
-# INTERACTIVE WIDGETS
+# BUTTONS
 # ==================================================================
-BUTTON_STYLES = {
-    "primary": {"fill": "primary", "fg": "#FFFFFF", "border": "primary"},
+BUTTON_KINDS = {
+    "primary": {"fill": "primary", "fg": None, "border": None},
     "soft": {"fill": "surface2", "fg": "text", "border": "border"},
-    "outline": {"fill": None, "fg": "primary_l", "border": "primary_d"},
     "ghost": {"fill": None, "fg": "text2", "border": None},
-    "success": {"fill": "success", "fg": "#04140D", "border": "success"},
-    "danger": {"fill": None, "fg": "danger", "border": "danger"},
+    "outline": {"fill": None, "fg": "primary_l", "border": "primary_d"},
+    "success": {"fill": "success", "fg": None, "border": None},
+    "danger": {"fill": None, "fg": "danger", "border": None},
 }
 
 
 class HoverButton(tk.Canvas):
-    """Rounded button with a soft hover transition."""
+    """Rounded button with a short hover transition."""
 
     def __init__(self, parent, app, text, command=None, icon=None, kind="primary",
-                 height=38, radius=10, font_size=10, bg=None, padx=16, min_width=0,
+                 height=38, radius=11, font_size=10, bg=None, padx=16, min_width=0,
                  tooltip=None, bold=True):
         self.app = app
         self.c = app.c
-        style = BUTTON_STYLES.get(kind, BUTTON_STYLES["primary"])
-        self._kind = kind
+        self._kind = kind if kind in BUTTON_KINDS else "primary"
+        self._spec = BUTTON_KINDS[self._kind]
         self._command = command
         self._font = (FONT_FAMILY, font_size, "bold" if bold else "normal")
         self._icon = icon
         self._padx = padx
         self._radius = radius
         self._height = height
-        self._bg = bg or parent.cget("bg")
+        self._host = bg or parent.cget("bg")
         self._enabled = True
         self._hover = False
         self._animation = None
         self._tooltip_text = tooltip
-        self._tooltip = None
-
-        text_width = tkfont.Font(font=self._font).measure(text)
-        icon_width = (16 + 7) if icon else 0
-        width = max(min_width, text_width + icon_width + padx * 2)
-
-        super().__init__(parent, width=width, height=height, bg=self._bg,
-                         highlightthickness=0, bd=0, cursor="hand2")
-        self._width = width
-        self._style = style
         self._text = text
-
-        self._base_fill, self._hover_fill, self._press_fill = self._palette(style)
-
+        self._min_width = min_width
+        self._width = self._measure(text)
+        super().__init__(parent, width=self._width, height=height, bg=self._host,
+                         highlightthickness=0, bd=0, cursor="hand2")
         self.bind("<Enter>", self._on_enter)
         self.bind("<Leave>", self._on_leave)
         self.bind("<Button-1>", self._on_press)
         self.bind("<ButtonRelease-1>", self._on_release)
-        self._draw(self._base_fill)
+        self._paint(0.0)
 
-    def _color(self, value):
-        """Resolve a theme key, or pass a literal colour straight through."""
-        if isinstance(value, str):
-            return self.c.get(value, value)
-        return value
+    # -- geometry ----------------------------------------------------
+    def _measure(self, text):
+        width = tkfont.Font(font=self._font).measure(text)
+        icon = 18 if self._icon else 0
+        return int(max(self._min_width, width + icon + self._padx * 2))
 
-    def _palette(self, style):
+    def set_text(self, text):
+        self._text = text
+        self._width = self._measure(text)
+        self.configure(width=self._width)
+        self._paint(0.0)
+
+    def set_enabled(self, enabled):
+        self._enabled = bool(enabled)
+        self.configure(cursor="hand2" if enabled else "arrow")
+        self._paint(0.0)
+
+    # -- palette -----------------------------------------------------
+    def _resolve(self, key):
+        return self.c.get(key, key) if isinstance(key, str) else key
+
+    def _colors(self):
         c = self.c
-        if style["fill"]:
-            base = self._color(style["fill"])
-            return base, shade(base, 1.14), shade(base, 0.88)
-        hover = c["surface2"] if self._kind != "danger" else mix(c["surface2"], c["danger"], 0.18)
-        return None, hover, mix(hover, c["text"], 0.06)
+        spec = self._spec
+        if not self._enabled:
+            return None, c["text3"], None, c["text3"]
+        fill = self._resolve(spec["fill"]) if spec["fill"] else None
+        border = self._resolve(spec["border"]) if spec["border"] else None
+        fg = spec["fg"]
+        fg = self._resolve(fg) if fg else readable_on(fill or c["primary"])
+        if self._kind == "danger":
+            border = mix(c["danger"], self._host, 0.55)
+        return fill, fg, border, fg
 
-    def _draw(self, fill=None, text_color=None):
+    # -- drawing -----------------------------------------------------
+    def _paint(self, hover_t=0.0, pressed=False):
         self.delete("all")
         c = self.c
-        border = self._color(self._style["border"]) if self._style["border"] else None
-        fill = fill if fill is not None else self._base_fill
-        if fill:
-            rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5, self._radius, fill=fill)
-        if border:
+        fill, fg, border, _ = self._colors()
+        if not self._enabled:
             rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5, self._radius,
-                  outline=border, width=1)
-        color = text_color or self._color(self._style["fg"])
+                  outline=border or c["border"], width=1)
+        elif fill:
+            base = shade(fill, 0.9) if pressed else shade(fill, 1 + 0.12 * hover_t)
+            rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5, self._radius,
+                  fill=base)
+            if self._kind in ("primary", "success"):
+                rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5,
+                      self._radius, outline=mix(base, "#FFFFFF", 0.18), width=1)
+        else:
+            if hover_t > 0:
+                hover_fill = mix(self._host, c["primary"] if self._kind != "danger"
+                                 else c["danger"], 0.14 * hover_t)
+                rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5,
+                      self._radius, fill=hover_fill)
+            if border:
+                rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5,
+                      self._radius, outline=border, width=1)
+            if self._kind == "ghost" and hover_t > 0:
+                fg = mix(fg, c["text"], hover_t)
+
         if self._icon:
             text_width = tkfont.Font(font=self._font).measure(self._text)
-            total = 16 + 7 + text_width
+            total = 18 + text_width
             start = (self._width - total) / 2
-            draw_icon(self, self._icon, start + 8, self._height / 2, size=15,
-                      color=color, width=1.8)
-            self.create_text(start + 23 + text_width / 2, self._height / 2 + 0.5,
-                             text=self._text, font=self._font, fill=color)
+            draw_icon(self, self._icon, start + 7, self._height / 2, size=15,
+                      color=fg, width=1.8)
+            self.create_text(start + 18 + text_width / 2, self._height / 2 + 0.5,
+                             text=self._text, font=self._font, fill=fg)
         else:
             self.create_text(self._width / 2, self._height / 2 + 0.5, text=self._text,
-                             font=self._font, fill=color)
+                             font=self._font, fill=fg)
 
-    def _on_enter(self, _event):
-        if not self._enabled:
-            return
-        self._hover = True
-        self._animate_to(self._hover_fill)
-        if self._style["fill"] is None and self._kind != "danger":
-            self._draw(self._hover_fill, self.c["text"])
-
-    def _on_leave(self, _event):
-        self._hover = False
-        self._cancel_animation()
-        self._draw(self._base_fill)
-
-    def _on_press(self, _event):
-        if not self._enabled:
-            return
-        self._cancel_animation()
-        self._draw(self._press_fill or self._base_fill)
-
-    def _on_release(self, event):
-        if not self._enabled:
-            return
-        inside = 0 <= event.x <= self._width and 0 <= event.y <= self._height
-        self._draw(self._hover_fill if inside else self._base_fill)
-        if inside and self._command:
-            self._command()
-
-    def _cancel_animation(self):
+    # -- interaction -------------------------------------------------
+    def _animate(self, target):
         if self._animation is not None:
             try:
                 self.after_cancel(self._animation)
@@ -1279,35 +1676,44 @@ class HoverButton(tk.Canvas):
                 pass
             self._animation = None
 
-    def _animate_to(self, target):
-        if not self._base_fill or not target:
-            return
-        self._cancel_animation()
-        start = self._base_fill
-        steps = 4
-
-        def step(index):
+        def step(index, start):
             if not self.winfo_exists():
                 return
-            self._draw(mix(start, target, index / steps))
-            if index < steps:
-                self._animation = self.after(28, lambda: step(index + 1))
+            t = start + (target - start) * (index / 4)
+            self._paint(t)
+            if index < 4:
+                self._animation = self.after(22, lambda: step(index + 1, start))
 
-        step(1)
+        step(1, 0.0 if target else 1.0)
 
-    def set_enabled(self, enabled: bool):
-        self._enabled = bool(enabled)
-        self.configure(cursor="hand2" if enabled else "arrow")
-        if enabled:
-            self._draw(self._base_fill)
-        else:
-            self._draw(self.c["surface2"], self.c["text3"])
+    def _on_enter(self, _event):
+        if not self._enabled:
+            return
+        self._hover = True
+        self._animate(1.0)
+
+    def _on_leave(self, _event):
+        self._hover = False
+        self._paint(0.0)
+
+    def _on_press(self, _event):
+        if not self._enabled:
+            return
+        self._paint(1.0, pressed=True)
+
+    def _on_release(self, event):
+        if not self._enabled:
+            return
+        inside = 0 <= event.x <= self._width and 0 <= event.y <= self._height
+        self._paint(1.0 if inside else 0.0)
+        if inside and self._command:
+            self._command()
 
 
 class IconButton(tk.Canvas):
     """Compact square icon button (edit / delete / theme toggle)."""
 
-    def __init__(self, parent, app, icon, command=None, size=30, icon_size=16,
+    def __init__(self, parent, app, icon, command=None, size=32, icon_size=16,
                  color=None, hover_color=None, bg=None, tooltip=None, radius=9):
         self.app = app
         self.c = app.c
@@ -1319,32 +1725,26 @@ class IconButton(tk.Canvas):
         self._size = size
         self._radius = radius
         self._hover = False
-        bg = bg or parent.cget("bg")
-        super().__init__(parent, width=size, height=size, bg=bg, highlightthickness=0,
-                         bd=0, cursor="hand2")
-        self.bind("<Enter>", self._on_enter)
-        self.bind("<Leave>", self._on_leave)
-        self.bind("<Button-1>", self._on_click)
+        self._host = bg or parent.cget("bg")
+        super().__init__(parent, width=size, height=size, bg=self._host,
+                         highlightthickness=0, bd=0, cursor="hand2")
+        self.bind("<Enter>", lambda _e=None: self._set_hover(True))
+        self.bind("<Leave>", lambda _e=None: self._set_hover(False))
+        self.bind("<Button-1>", lambda _e=None: self._command() if self._command else None)
+        self._draw()
+
+    def _set_hover(self, hover):
+        self._hover = hover
         self._draw()
 
     def _draw(self):
         self.delete("all")
         if self._hover:
-            rrect(self, 0, 0, self._size, self._size, self._radius, fill=self.c["surface2"])
-        draw_icon(self, self._icon, self._size / 2, self._size / 2, size=self._icon_size,
+            rrect(self, 0, 0, self._size, self._size, self._radius,
+                  fill=mix(self._host, self.c["primary"], 0.16))
+        draw_icon(self, self._icon, self._size / 2, self._size / 2,
+                  size=self._icon_size,
                   color=self._hover_color if self._hover else self._color, width=1.7)
-
-    def _on_enter(self, _event):
-        self._hover = True
-        self._draw()
-
-    def _on_leave(self, _event):
-        self._hover = False
-        self._draw()
-
-    def _on_click(self, _event):
-        if self._command:
-            self._command()
 
 
 class CheckCircle(tk.Canvas):
@@ -1355,65 +1755,61 @@ class CheckCircle(tk.Canvas):
         self.app = app
         self.c = app.c
         self._checked = bool(checked)
-        self._color = color or self.c["primary"]
+        self._color = color or self.c["success"]
         self._command = command
         self._size = size
-        self._pulse_items = []
-        super().__init__(parent, width=size, height=size, bg=bg or parent.cget("bg"),
+        self._hover = False
+        self._host = bg or parent.cget("bg")
+        super().__init__(parent, width=size, height=size, bg=self._host,
                          highlightthickness=0, bd=0, cursor="hand2")
-        self.bind("<Enter>", lambda _e: self._draw(hover=True))
-        self.bind("<Leave>", lambda _e: self._draw(hover=False))
+        self.bind("<Enter>", lambda _e=None: self._set_hover(True))
+        self.bind("<Leave>", lambda _e=None: self._set_hover(False))
         self.bind("<Button-1>", self._on_click)
         self._draw()
 
-    def _draw(self, hover=False):
+    def _set_hover(self, hover):
+        self._hover = hover
+        self._draw()
+
+    def _draw(self, scale=1.0, fill=None):
         self.delete("all")
         size = self._size
         inset = 1.5
-        radius = size * 0.32
+        if fill is None:
+            fill = self._color if self._checked else None
+        outline = None
+        if not self._checked:
+            outline = self.c["primary"] if self._hover else self.c["border_hi"]
+        box = size / 2 - (size / 2 - inset) * scale
+        rrect(self, box, box, size - box, size - box, (size * 0.30) * scale,
+              fill=fill, outline=outline, width=1.6)
         if self._checked:
-            rrect(self, inset, inset, size - inset, size - inset, radius, fill=self._color)
-            draw_icon(self, "check", size / 2, size / 2, size=size * 0.62,
-                      color=readable_on(self._color), width=2.4)
-        else:
-            outline = self._color if hover else self.c["border_hi"]
-            rrect(self, inset, inset, size - inset, size - inset, radius,
-                  outline=outline, width=1.6)
+            draw_icon(self, "check", size / 2, size / 2, size=size * 0.60,
+                      color=readable_on(fill or self._color), width=2.4)
 
     def _on_click(self, _event):
-        self._pulse()
         if self._command:
             self._command()
 
-    def _pulse(self):
-        size = self._size
-        for item in self._pulse_items:
-            try:
-                self.delete(item)
-            except tk.TclError:
-                pass
-        self._pulse_items = rrect(self, -2, -2, size + 2, size + 2, size * 0.36,
-                                  outline=self._color, width=1)
-        self.after(180, self._clear_pulse)
-
-    def _clear_pulse(self):
-        for item in self._pulse_items:
-            try:
-                self.delete(item)
-            except tk.TclError:
-                pass
-        self._pulse_items = []
-
-    def set_checked(self, checked: bool):
+    def set_checked(self, checked, animate=False):
+        was = self._checked
         self._checked = bool(checked)
         self._draw()
+        if animate and self._checked and not was:
+            self._pop()
 
+    def _pop(self):
+        for index, scale in enumerate((1.16, 1.08, 1.0)):
+            self.after(index * 45, lambda s=scale: self.winfo_exists() and self._draw(s))
 
+# ==================================================================
+# DATA VISUALS
+# ==================================================================
 class ProgressRing(tk.Canvas):
-    """Arc-based completion ring with an eased fill animation."""
+    """Arc completion ring with an eased fill and a cyan end cap."""
 
-    def __init__(self, parent, app, size=176, thickness=12, pct=0.0, bg=None,
-                 color=None, caption="complete", sub=None):
+    def __init__(self, parent, app, size=152, thickness=11, pct=0.0, bg=None,
+                 caption="complete", color=None):
         self.app = app
         self.c = app.c
         self._size = size
@@ -1422,7 +1818,6 @@ class ProgressRing(tk.Canvas):
         self._pct = 0.0
         self._target = max(0.0, min(1.0, pct))
         self._caption = caption
-        self._sub = sub
         self._animation = None
         super().__init__(parent, width=size, height=size, bg=bg or parent.cget("bg"),
                          highlightthickness=0, bd=0)
@@ -1453,48 +1848,98 @@ class ProgressRing(tk.Canvas):
 
         step(1)
 
-    def set_labels(self, caption=None, sub=None):
-        if caption is not None:
-            self._caption = caption
-        self._sub = sub
-        self._draw(self._pct)
-
     def _draw(self, pct):
         self.delete("all")
+        c = self.c
         size = self._size
-        pad = self._thickness / 2 + 2
+        thickness = self._thickness
+        pad = thickness / 2 + 2
         box = (pad, pad, size - pad, size - pad)
-        self.create_oval(*box, outline=self.c["ring_track"], width=self._thickness)
+        self.create_oval(*box, outline=c["ring_track"], width=thickness)
         if pct > 0.001:
-            self.create_arc(*box, start=90, extent=-359.99 * pct, style="arc",
-                            outline=self._color, width=self._thickness)
-            # bright cap for a subtle neon shoulder
-            self.create_arc(*box, start=90, extent=-min(359.99 * pct, 8), style="arc",
-                            outline=mix(self._color, "#FFFFFF", 0.45), width=self._thickness - 2)
-        self.create_text(size / 2, size / 2 - 6, text=f"{int(round(pct * 100))}%",
-                         font=(FONT_FAMILY, int(size * 0.19), "bold"), fill=self.c["text"])
-        self.create_text(size / 2, size / 2 + int(size * 0.14), text=self._caption,
-                         font=(FONT_FAMILY, 9), fill=self.c["text2"])
-        if self._sub:
-            self.create_text(size / 2, size / 2 + int(size * 0.14) + 17, text=self._sub,
-                             font=(FONT_FAMILY, 9, "bold"), fill=self.c["primary_l"])
+            extent = -359.99 * pct
+            self.create_arc(*box, start=90, extent=extent, style="arc",
+                            outline=self._color, width=thickness)
+            # cyan shoulder near the leading edge for a subtle "live" feel
+            self.create_arc(*box, start=90, extent=max(extent, -10) if extent > -10 else -10,
+                            style="arc", outline=c["cyan"], width=max(2, thickness - 5))
+            angle = math.radians(90 + extent)
+            radius = (size - pad * 2) / 2
+            cx = size / 2 + radius * math.cos(angle)
+            cy = size / 2 - radius * math.sin(angle)
+            dot = max(2.6, thickness * 0.30)
+            self.create_oval(cx - dot, cy - dot, cx + dot, cy + dot,
+                             fill=c["cyan"], outline="")
+        self.create_text(size / 2, size / 2 - 4, text=f"{int(round(pct * 100))}%",
+                         font=(FONT_FAMILY, int(size * 0.21), "bold"), fill=c["text"])
+        self.create_text(size / 2, size / 2 + int(size * 0.15), text=self._caption,
+                         font=(FONT_FAMILY, 9), fill=c["text2"])
+
+
+class SegmentBar(tk.Canvas):
+    """One segment per habit: a HUD-style progress readout."""
+
+    def __init__(self, parent, app, total=0, done=0, height=7, bg=None, gap=5):
+        self.app = app
+        self.c = app.c
+        self._total = max(0, total)
+        self._done = max(0, done)
+        self._gap = gap
+        self._height = height
+        super().__init__(parent, height=height, bg=bg or parent.cget("bg"),
+                         highlightthickness=0, bd=0)
+        self.bind("<Configure>", lambda _e=None: self._draw(animate=False))
+
+    def set_values(self, done, total, animate=True):
+        self._done, self._total = max(0, done), max(0, total)
+        if animate:
+            self._animate(0)
+        else:
+            self._draw(animate=False)
+
+    def _animate(self, step):
+        if not self.winfo_exists():
+            return
+        self._draw(progress=min(1.0, step / 4))
+        if step < 4:
+            self.after(30, lambda: self._animate(step + 1))
+
+    def _draw(self, animate=False, progress=1.0):
+        self.delete("all")
+        width = self.winfo_width()
+        height = self.winfo_height() or self._height
+        if width < 10:
+            return
+        if self._total <= 0:
+            rrect(self, 0, 0, width, height, height / 2, fill=self.c["track"])
+            return
+        gap = self._gap
+        seg_w = max(3.0, (width - gap * (self._total - 1)) / self._total)
+        for index in range(self._total):
+            x1 = index * (seg_w + gap)
+            filled = index < self._done
+            color = self.c["success"] if filled else self.c["track"]
+            if filled and progress < 1.0:
+                color = mix(self.c["track"], self.c["success"], progress)
+            rrect(self, x1, 0, x1 + seg_w, height, height / 2, fill=color)
 
 
 class WeekBars(tk.Canvas):
-    """Seven-day completion chart drawn with rounded neon bars."""
+    """Seven-day completion chart with an axis, gridlines and value labels."""
 
-    def __init__(self, parent, app, height=136, values=None, labels=None,
-                 highlight=None, bg=None, show_values=True):
+    def __init__(self, parent, app, height=168, values=None, labels=None,
+                 dates=None, highlight=None, bg=None, show_values=True):
         self.app = app
         self.c = app.c
         self._values = list(values or [])
         self._labels = list(labels or [])
+        self._dates = list(dates or [])
         self._highlight = highlight
         self._show_values = show_values
         self._progress = 0.0
         self._bg = bg or parent.cget("bg")
         super().__init__(parent, height=height, bg=self._bg, highlightthickness=0, bd=0)
-        self.bind("<Configure>", lambda _e: self._draw(self._progress))
+        self.bind("<Configure>", lambda _e=None: self._draw(self._progress))
         self.after(70, self._animate)
 
     def set_values(self, values, labels=None, highlight=None, animate=True):
@@ -1512,120 +1957,320 @@ class WeekBars(tk.Canvas):
     def _animate(self):
         if not self.winfo_exists():
             return
-        self._progress = min(1.0, self._progress + 0.14)
-        self._draw(1 - (1 - self._progress) ** 2.4 if self._progress < 1 else 1.0)
+        self._progress = min(1.0, self._progress + 0.13)
+        eased = 1 - (1 - self._progress) ** 2.4 if self._progress < 1 else 1.0
+        self._draw(eased)
         if self._progress < 1:
-            self.after(24, self._animate)
+            self.after(26, self._animate)
 
     def _draw(self, progress):
         self.delete("all")
+        c = self.c
         width = self.winfo_width()
         height = self.winfo_height()
-        if width <= 10 or height <= 10 or not self._values:
+        if width <= 40 or height <= 40 or not self._values:
             return
-        c = self.c
-        label_band = 22
-        value_band = 16
-        chart_height = height - label_band - value_band
-        baseline = value_band + chart_height
-        slot = width / len(self._values)
-        bar_width = min(30, max(10, slot * 0.44))
+
+        axis_w = 26
+        top_pad = 20
+        bottom_pad = 24
+        plot_x0 = axis_w
+        plot_x1 = width - 4
+        plot_y0 = top_pad
+        plot_y1 = height - bottom_pad
+        plot_w = max(10, plot_x1 - plot_x0)
+        plot_h = max(10, plot_y1 - plot_y0)
+        count = len(self._values)
+        slot = plot_w / count
+        bar_w = min(30, max(9, slot * 0.44))
+
+        # gridlines + axis labels (0 / 50 / 100 keeps it quiet)
+        for level in (0, 50, 100):
+            y = plot_y1 - (level / 100) * plot_h
+            if level:
+                self.create_line(plot_x0, y, plot_x1, y, fill=mix(c["border"], self._bg, 0.35),
+                                 dash=(2, 6))
+            else:
+                self.create_line(plot_x0, y, plot_x1, y, fill=c["border"])
+            self.create_text(axis_w - 7, y, text=f"{level}", anchor="e",
+                             font=(FONT_FAMILY, 8), fill=c["text3"])
 
         for index, value in enumerate(self._values):
-            centre = slot * index + slot / 2
+            centre = plot_x0 + slot * index + slot / 2
             is_today = self._highlight == index
-            # Faint track behind every slot so empty days read as empty, not noise.
-            rrect(self, centre - bar_width / 2, baseline - chart_height,
-                  centre + bar_width / 2, baseline, min(7, bar_width / 2),
-                  fill=mix(self._bg, c["surface3"], 0.22))
-            bar_height = max(3.0, (value / 100.0) * chart_height * progress)
-            top = baseline - bar_height
-            if is_today:
-                color = c["primary"]
-            elif value > 0:
-                color = mix(c["primary_d"], c["primary"], 0.45)
+            value = max(0, min(100, value))
+            # an empty day shows only a quiet stub on the baseline
+            if value <= 0:
+                rrect(self, centre - bar_w / 2, plot_y1 - 5, centre + bar_w / 2, plot_y1,
+                      min(3, bar_w / 2), fill=mix(c["text3"], self._bg, 0.55))
             else:
-                color = c["surface3"]
-            rrect(self, centre - bar_width / 2, top, centre + bar_width / 2, baseline,
-                  min(7, bar_width / 2), fill=color)
-            if is_today:
-                rrect(self, centre - bar_width / 2 - 3, top - 3,
-                      centre + bar_width / 2 + 3, baseline + 3,
-                      min(10, bar_width / 2 + 3), outline=mix(c["primary"], c["bg"], 0.55),
-                      width=1)
-            if self._show_values and value > 0 and progress > 0.85:
-                self.create_text(centre, top - 9, text=f"{int(value)}%",
-                                 font=(FONT_FAMILY, 8, "bold"),
-                                 fill=c["primary_l"] if is_today else c["text3"])
+                bar_h = max(6.0, (value / 100.0) * plot_h * progress)
+                top = plot_y1 - bar_h
+                if is_today:
+                    color = c["primary"]
+                elif value >= 100:
+                    color = mix(c["primary_d"], c["primary"], 0.72)
+                else:
+                    color = mix(c["primary_d"], c["primary"], 0.42)
+                rrect(self, centre - bar_w / 2, top, centre + bar_w / 2, plot_y1,
+                      min(7, bar_w / 2), fill=color)
+                if is_today:
+                    rrect(self, centre - bar_w / 2, top, centre + bar_w / 2,
+                          top + 3, min(2, bar_w / 2), fill=c["cyan"])
+            # Only partial days get a number: full bars would collide with the
+            # axis and empty days read better without a "0" under every bar.
+            if self._show_values and slot >= 30 and progress > 0.8 and 0 < value < 100:
+                bar_top = plot_y1 - (value / 100.0) * plot_h * progress
+                if bar_top - plot_y0 < 20:
+                    self.create_text(centre, bar_top + 12, text=f"{int(round(value))}",
+                                     font=(FONT_FAMILY, 8, "bold"), fill="#FFFFFF")
+                else:
+                    self.create_text(centre, bar_top - 11, text=f"{int(round(value))}",
+                                     font=(FONT_FAMILY, 8, "bold"),
+                                     fill=c["primary_l"] if is_today else c["text3"])
             label = self._labels[index] if index < len(self._labels) else ""
-            self.create_text(centre, baseline + 13, text=label,
+            self.create_text(centre, plot_y1 + 14, text=label,
                              font=(FONT_FAMILY, 9, "bold" if is_today else "normal"),
                              fill=c["primary_l"] if is_today else c["text2"])
 
+        if not any(self._values):
+            self.create_text(plot_x0 + plot_w / 2, plot_y0 + plot_h / 2 - 4,
+                             text="No activity logged this week yet",
+                             font=(FONT_FAMILY, 9), fill=c["text3"])
 
-class Segmented(tk.Canvas):
-    """Two-or-more option segmented control."""
 
-    def __init__(self, parent, app, options, value, command=None, height=34,
-                 option_width=92, bg=None):
+class TrendChart(tk.Canvas):
+    """Completion trend line with a stippled area fill (no dependencies)."""
+
+    def __init__(self, parent, app, values, labels=None, height=190, color=None, bg=None):
+        self.c = app.c
+        self._values = list(values)
+        self._labels = list(labels or [])
+        self._color = color or self.c["primary"]
+        self._bg = bg or parent.cget("bg")
+        self._progress = 0.0
+        super().__init__(parent, height=height, bg=self._bg, highlightthickness=0, bd=0)
+        self.bind("<Configure>", lambda _e=None: self._draw(self._progress))
+        self.after(80, self._animate)
+
+    def _animate(self):
+        if not self.winfo_exists():
+            return
+        self._progress = min(1.0, self._progress + 0.12)
+        eased = 1 - (1 - self._progress) ** 2.5 if self._progress < 1 else 1.0
+        self._draw(eased)
+        if self._progress < 1:
+            self.after(26, self._animate)
+
+    def _draw(self, progress=1.0):
+        self.delete("all")
+        c = self.c
+        width = self.winfo_width()
+        height = self.winfo_height()
+        if width < 60 or height < 50 or not self._values:
+            return
+        left, right, top, bottom = 30, 12, 14, 22
+        chart_w = width - left - right
+        chart_h = height - top - bottom
+        count = len(self._values)
+
+        for level in (0, 50, 100):
+            y = top + chart_h - (level / 100) * chart_h
+            if level:
+                self.create_line(left, y, width - right, y,
+                                 fill=mix(c["border"], self._bg, 0.35), dash=(2, 6))
+            else:
+                self.create_line(left, y, width - right, y, fill=c["border"])
+            self.create_text(left - 7, y, text=str(level), anchor="e",
+                             font=(FONT_FAMILY, 8), fill=c["text3"])
+
+        def point(index, value):
+            x = left + (chart_w * index / max(1, count - 1))
+            y = top + chart_h - (max(0.0, min(100.0, value)) / 100) * chart_h * progress
+            return x, y
+
+        points = [point(index, value) for index, value in enumerate(self._values)]
+        if len(points) > 1:
+            area = points + [(points[-1][0], top + chart_h), (points[0][0], top + chart_h)]
+            self.create_polygon(*[coord for pair in area for coord in pair],
+                                fill=mix(self._color, self._bg, 0.78), outline="")
+            self.create_line(*[coord for pair in points for coord in pair],
+                             fill=self._color, width=2, smooth=True, splinesteps=16,
+                             capstyle="round", joinstyle="round")
+        for index, (x, y) in enumerate(points):
+            last = index == count - 1
+            radius = 3.6 if last else 2.0
+            if last:
+                self.create_oval(x - 8, y - 8, x + 8, y + 8, outline=c["cyan"], width=1)
+            self.create_oval(x - radius, y - radius, x + radius, y + radius,
+                             fill=self._color if last else self._bg,
+                             outline=self._color, width=1.4)
+        if progress > 0.9:
+            last_x, last_y = points[-1]
+            self.create_text(last_x - 12, max(top + 6, last_y - 14),
+                             text=f"{int(self._values[-1])}%", anchor="e",
+                             font=(FONT_FAMILY, 9, "bold"), fill=c["primary_l"])
+        step = max(1, count // 6)
+        for index in range(0, count, step):
+            x = left + (chart_w * index / max(1, count - 1))
+            label = self._labels[index] if index < len(self._labels) else ""
+            self.create_text(x, height - 7, text=label,
+                             font=(FONT_FAMILY, 8), fill=c["text3"])
+
+
+# ==================================================================
+# NAVIGATION + TILES
+# ==================================================================
+class NavButton(tk.Canvas):
+    """Sidebar navigation item with a clear active indicator."""
+
+    def __init__(self, parent, app, icon, label, command, width=224, height=44):
         self.app = app
         self.c = app.c
-        self._segments = list(options)
-        self._value = value
+        self._icon = icon
+        self._label = label
         self._command = command
-        self._height = height
-        self._option_width = option_width
-        self._bg = bg or parent.cget("bg")
-        width = option_width * len(options) + 8
-        super().__init__(parent, width=width, height=height, bg=self._bg,
+        self._active = False
+        self._hover = False
+        super().__init__(parent, width=width, height=height, bg=self.c["sidebar"],
                          highlightthickness=0, bd=0, cursor="hand2")
         self._width = width
-        self.bind("<Button-1>", self._on_click)
+        self._height = height
+        self.bind("<Button-1>", lambda _e=None: self._command(label))
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
         self._draw()
 
     def _draw(self):
         self.delete("all")
         c = self.c
-        rrect(self, 0, 0, self._width, self._height, self._height / 2, fill=c["surface2"])
-        rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5, self._height / 2,
-              outline=c["border"], width=1)
-        index = self._segments.index(self._value) if self._value in self._segments else 0
-        pad = 4
-        pill_w = self._width / len(self._segments) - pad
-        rrect(self, pad + index * (self._width / len(self._segments)), pad,
-              pad + index * (self._width / len(self._segments)) + pill_w,
-              self._height - pad, (self._height - pad * 2) / 2, fill=c["primary"])
-        for position, option in enumerate(self._segments):
-            centre = (self._width / len(self._segments)) * position + self._width / len(self._segments) / 2
-            active = position == index
-            self.create_text(centre, self._height / 2 + 0.5, text=option,
-                             font=(FONT_FAMILY, 9, "bold" if active else "normal"),
-                             fill="#FFFFFF" if active else c["text2"])
+        if self._active:
+            rrect(self, 0, 0, self._width, self._height, 10, fill=c["side_active"])
+            rrect(self, 0, self._height * 0.26, 3, self._height * 0.74, 1.5,
+                  fill=c["cyan"])
+        elif self._hover:
+            rrect(self, 0, 0, self._width, self._height, 10,
+                  fill=mix(c["sidebar"], c["side_active"], 0.6))
+        icon_color = c["cyan"] if self._active else (
+            c["side_text"] if self._hover else c["side_text2"])
+        text_color = c["side_text"] if (self._active or self._hover) else c["side_text2"]
+        draw_icon(self, self._icon, 22, self._height / 2, size=17,
+                  color=icon_color, width=1.8)
+        self.create_text(42, self._height / 2 + 0.5, text=self._label, anchor="w",
+                         font=(FONT_FAMILY, 11, "bold" if self._active else "normal"),
+                         fill=text_color)
 
-    def _on_click(self, event):
-        slot = self._width / len(self._segments)
-        index = min(len(self._segments) - 1, max(0, int(event.x // slot)))
-        value = self._segments[index]
-        if value != self._value:
-            self._value = value
-            self._draw()
-            if self._command:
-                self._command(value)
+    def set_active(self, active):
+        self._active = bool(active)
+        self._draw()
 
+    def _on_enter(self, _event):
+        self._hover = True
+        self._draw()
+
+    def _on_leave(self, _event):
+        self._hover = False
+        self._draw()
+
+
+class StatTile(Card):
+    """Compact metric tile: value first, then what it means."""
+
+    def __init__(self, parent, app, icon, color, value, label, hint=None, bg=None):
+        super().__init__(parent, app, radius=16, pad=(18, 15), bg=bg, hoverable=True)
+        c = self.c
+        self._value = value
+        self._label = label
+        self._hint = hint
+
+        top = tk.Frame(self.body, bg=c["card"])
+        top.pack(fill="x")
+        self._value_label = tk.Label(top, text=value, bg=c["card"], fg=c["text"],
+                                     font=f(22, "bold"), anchor="w")
+        self._value_label.pack(side="left")
+        icon_box = tk.Canvas(top, width=30, height=30, bg=c["card"],
+                             highlightthickness=0, bd=0)
+        icon_box.pack(side="right")
+        rrect(icon_box, 0, 0, 30, 30, 9, fill=mix(color, c["card"], 0.84))
+        draw_icon(icon_box, icon, 15, 15, size=16, color=color, width=1.8)
+
+        tk.Label(self.body, text=label, bg=c["card"], fg=c["text2"], font=f(10),
+                 anchor="w").pack(fill="x", pady=(6, 0))
+        if hint:
+            self._hint_label = tk.Label(self.body, text=hint, bg=c["card"],
+                                        fg=c["text3"], font=f(9), anchor="w")
+            self._hint_label.pack(fill="x", pady=(1, 0))
+
+    def set_value(self, value, hint=None):
+        self._value_label.configure(text=value)
+        if hint is not None and getattr(self, "_hint_label", None) is not None:
+            self._hint_label.configure(text=hint)
+
+
+class MilestoneRow(tk.Frame):
+    """Compact achievement line with an earned / locked state."""
+
+    def __init__(self, parent, app, item):
+        c = app.c
+        bg = parent.cget("bg")
+        super().__init__(parent, bg=bg)
+        earned = bool(item.get("earned"))
+        color = c["success"] if earned else c["text3"]
+        self.columnconfigure(1, weight=1)
+
+        icon = tk.Canvas(self, width=30, height=30, bg=bg, highlightthickness=0, bd=0)
+        icon.grid(row=0, column=0, sticky="w", padx=(0, 11))
+        rrect(icon, 0, 0, 30, 30, 9,
+              fill=mix(color, bg, 0.84) if earned else mix(c["surface3"], bg, 0.5))
+        draw_icon(icon, item["icon"], 15, 15, size=15, color=color,
+                  width=1.7 if earned else 1.6)
+
+        text = tk.Frame(self, bg=bg)
+        text.grid(row=0, column=1, sticky="ew")
+        tk.Label(text, text=item["name"], bg=bg,
+                 fg=c["text"] if earned else c["text2"], font=f(10, "bold"),
+                 anchor="w").pack(anchor="w")
+        tk.Label(text, text=item.get("desc", ""), bg=bg, fg=c["text3"], font=f(9),
+                 anchor="w").pack(anchor="w")
+
+        track = mix(c["text3"], bg, 0.78)
+        fraction = item.get("fraction", 1.0 if earned else 0.0)
+        bar = tk.Canvas(self, width=58, height=4, bg=bg, highlightthickness=0, bd=0)
+        bar.grid(row=0, column=2, padx=(14, 12))
+        bar.bind("<Configure>",
+                 lambda _e, canvas=bar, f=fraction, col=color, tr=track:
+                 self._draw_bar(canvas, f, col, tr))
+
+        tk.Label(self, text="Earned" if earned else item.get("progress", ""), bg=bg,
+                 fg=c["success"] if earned else c["text3"],
+                 font=f(9, "bold" if earned else "normal"), anchor="e", width=7).grid(
+            row=0, column=3, sticky="e")
+
+    @staticmethod
+    def _draw_bar(canvas, fraction, color, track):
+        canvas.delete("all")
+        width = canvas.winfo_width()
+        if width < 4:
+            return
+        rrect(canvas, 0, 0, width, 4, 2, fill=track)
+        if fraction > 0:
+            rrect(canvas, 0, 0, max(4, width * max(0.0, min(1.0, fraction))), 4, 2,
+                  fill=color)
 
 # ==================================================================
 # TOASTS
 # ==================================================================
 def show_toast(root, message, theme, kind="success", duration=2600):
-    """Floating confirmation toast with a short fade in/out."""
+    """Floating confirmation toast with a short fade in / out."""
     accents = {
         "success": theme["success"],
         "info": theme["primary"],
         "warning": theme["warning"],
         "danger": theme["danger"],
-        "xp": theme["primary_l"],
+        "xp": theme["cyan"],
     }
-    icons = {"success": "check", "info": "info", "warning": "bolt", "danger": "close", "xp": "spark"}
+    icons = {"success": "check", "info": "info", "warning": "bolt",
+             "danger": "close", "xp": "spark"}
     accent = accents.get(kind, theme["success"])
     icon = icons.get(kind, "check")
 
@@ -1640,12 +2285,10 @@ def show_toast(root, message, theme, kind="success", duration=2600):
         toast.attributes("-topmost", True)
     except tk.TclError:
         pass
-    width, height = 360, 62
+    width, height = 372, 62
     screen_w = root.winfo_screenwidth()
     screen_h = root.winfo_screenheight()
-    x = screen_w - width - 28
-    y = screen_h - height - 64
-    toast.geometry(f"{width}x{height}+{x}+{y}")
+    toast.geometry(f"{width}x{height}+{screen_w - width - 28}+{screen_h - height - 64}")
     toast.configure(bg=theme["bg"])
 
     canvas = tk.Canvas(toast, width=width, height=height, bg=theme["bg"],
@@ -1654,10 +2297,10 @@ def show_toast(root, message, theme, kind="success", duration=2600):
     rrect(canvas, 1, 1, width - 1, height - 1, 14, fill=theme["toast"])
     rrect(canvas, 1, 1, width - 1, height - 1, 14,
           outline=mix(theme["border"], accent, 0.45), width=1)
-    rrect(canvas, 1, 14, 4, height - 14, 1.5, fill=accent)
+    rrect(canvas, 1, 16, 4, height - 16, 1.5, fill=accent)
     draw_icon(canvas, icon, 30, height / 2, size=17, color=accent, width=2)
     canvas.create_text(52, height / 2, text=message, anchor="w",
-                       font=(FONT_FAMILY, 10), fill=theme["text"])
+                       font=(FONT_FAMILY, 11), fill=theme["text"])
 
     try:
         toast.attributes("-alpha", 0.0)
@@ -1667,9 +2310,8 @@ def show_toast(root, message, theme, kind="success", duration=2600):
     def fade(step, target, done=None):
         if not toast.winfo_exists():
             return
-        alpha = step / 6
         try:
-            toast.attributes("-alpha", 0.0 if target == 0 else alpha)
+            toast.attributes("-alpha", 0.0 if target == 0 else step / 6)
         except tk.TclError:
             pass
         if step < 6:
@@ -1678,19 +2320,16 @@ def show_toast(root, message, theme, kind="success", duration=2600):
             done()
 
     def dismiss():
-        def close():
-            if toast.winfo_exists():
-                toast.destroy()
-
-        fade(6, 0, close)
+        fade(6, 0, lambda: toast.winfo_exists() and toast.destroy())
 
     fade(0, 1)
     toast.after(duration, dismiss)
+
 # ==================================================================
-# FORM CONTROLS + HABIT DIALOG
+# FORM CONTROLS
 # ==================================================================
 def configure_ttk(root, theme):
-    """Theme the ttk widgets that Tk does not paint itself (comboboxes)."""
+    """Theme the ttk widgets Tk does not paint itself (comboboxes)."""
     style = ttk.Style(root)
     try:
         style.theme_use("clam")
@@ -1706,7 +2345,7 @@ def configure_ttk(root, theme):
         lightcolor=theme["surface2"],
         darkcolor=theme["surface2"],
         insertcolor=theme["text"],
-        padding=6,
+        padding=7,
     )
     style.map(
         "HF.TCombobox",
@@ -1720,7 +2359,6 @@ def configure_ttk(root, theme):
     root.option_add("*TCombobox*Listbox.selectBackground", theme["primary"])
     root.option_add("*TCombobox*Listbox.selectForeground", "#FFFFFF")
     root.option_add("*TCombobox*Listbox.font", f(10))
-    style.configure("HF.Vertical.TScrollbar", background=theme["surface3"])
 
 
 class Switch(tk.Canvas):
@@ -1743,7 +2381,8 @@ class Switch(tk.Canvas):
         self.delete("all")
         c = self.c
         track = mix(c["surface3"], c["primary"], position)
-        rrect(self, 1, 1, self._width - 1, self._height - 1, (self._height - 2) / 2, fill=track)
+        rrect(self, 1, 1, self._width - 1, self._height - 1, (self._height - 2) / 2,
+              fill=track)
         rrect(self, 1, 1, self._width - 1, self._height - 1, (self._height - 2) / 2,
               outline=mix(c["border"], c["primary"], position * 0.7), width=1)
         radius = (self._height - 8) / 2
@@ -1775,10 +2414,10 @@ class Switch(tk.Canvas):
 
 
 class ChoiceChip(tk.Canvas):
-    """Selectable chip used for categories and weekday toggles."""
+    """Selectable chip used for categories, filters and weekday toggles."""
 
     def __init__(self, parent, app, text, color=None, selected=False, command=None,
-                 height=28, font_size=9, bg=None, dot=False, width=None):
+                 height=28, font_size=9, bg=None, dot=False, width=None, radius=None):
         self.app = app
         self.c = app.c
         self._text = text
@@ -1786,37 +2425,43 @@ class ChoiceChip(tk.Canvas):
         self._selected = selected
         self._command = command
         self._height = height
-        self._font = (FONT_FAMILY, font_size, "bold")
+        self._font = (FONT_FAMILY, font_size, "bold" if selected else "normal")
         self._dot = dot
-        text_width = tkfont.Font(font=self._font).measure(text)
-        self._width = width or text_width + (34 if dot else 22)
-        super().__init__(parent, width=self._width, height=height, bg=bg or parent.cget("bg"),
+        self._host = bg or parent.cget("bg")
+        text_width = tkfont.Font(font=(FONT_FAMILY, font_size, "bold")).measure(text)
+        self._width = width or int(text_width + (36 if dot else 24))
+        self._radius = radius or height / 2
+        super().__init__(parent, width=self._width, height=height, bg=self._host,
                          highlightthickness=0, bd=0, cursor="hand2")
         self.bind("<Button-1>", self._on_click)
-        self.bind("<Enter>", lambda _e: self._draw(hover=True))
-        self.bind("<Leave>", lambda _e: self._draw(hover=False))
+        self.bind("<Enter>", lambda _e=None: self._draw(hover=True))
+        self.bind("<Leave>", lambda _e=None: self._draw(hover=False))
         self._draw()
 
     def _draw(self, hover=False):
         self.delete("all")
         c = self.c
+        self._font = (FONT_FAMILY, self._font[1], "bold" if self._selected else "normal")
         if self._selected:
-            rrect(self, 1, 1, self._width - 1, self._height - 1, self._height / 2,
-                  fill=self._color)
+            rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5, self._radius,
+                  fill=mix(self._color, self._host, 0.78),
+                  outline=mix(self._color, self._host, 0.35), width=1)
         else:
-            border = mix(c["border"], self._color, 0.55 if hover else 0.25)
-            rrect(self, 1, 1, self._width - 1, self._height - 1, self._height / 2,
-                  fill=c["surface2"] if hover else None,
-                  outline=border, width=1)
-        fg = readable_on(self._color) if self._selected else (self._color if hover else c["text2"])
+            rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5, self._radius,
+                  fill=mix(self._host, c["surface2"], 0.85) if hover else None,
+                  outline=mix(c["border"], self._color, 0.3 if hover else 0.0), width=1)
+        fg = self._color if (self._selected or hover) else c["text2"]
+        if not self._selected and not hover:
+            fg = c["text2"]
         text_x = self._width / 2
         if self._dot:
-            self.create_oval(11, self._height / 2 - 3, 17, self._height / 2 + 3,
-                             fill=fg, outline="")
+            self.create_oval(12, self._height / 2 - 3, 18, self._height / 2 + 3,
+                             fill=self._color, outline="")
             text_x = 20 + (self._width - 20) / 2
-        self.create_text(text_x, self._height / 2 + 0.5, text=self._text, font=self._font, fill=fg)
+        self.create_text(text_x, self._height / 2 + 0.5, text=self._text,
+                         font=self._font, fill=fg)
 
-    def set_selected(self, selected: bool):
+    def set_selected(self, selected):
         self._selected = bool(selected)
         self._draw()
 
@@ -1825,6 +2470,9 @@ class ChoiceChip(tk.Canvas):
             self._command(self._text)
 
 
+# ==================================================================
+# HABIT DIALOG
+# ==================================================================
 class TaskDialog(tk.Toplevel):
     """Modal dialog to create or edit a habit (same fields as v1)."""
 
@@ -1851,159 +2499,159 @@ class TaskDialog(tk.Toplevel):
 
         self.update_idletasks()
         self._centre_on(parent)
-        self.bind("<Escape>", lambda _e: self.destroy())
+        self.bind("<Escape>", lambda _e=None: self.destroy())
         self.bind("<Return>", self._on_return)
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.wait_window()
 
-    # -- layout helpers ----------------------------------------------
+    # -- helpers -----------------------------------------------------
     def _centre_on(self, parent):
         try:
             px, py = parent.winfo_rootx(), parent.winfo_rooty()
             pw, ph = parent.winfo_width(), parent.winfo_height()
         except tk.TclError:
             return
-        width = self.winfo_reqwidth()
-        height = self.winfo_reqheight()
-        x = px + max(0, (pw - width) // 2)
-        y = py + max(0, (ph - height) // 3)
-        self.geometry(f"+{x}+{y}")
+        self.geometry(f"+{px + max(0, (pw - self.winfo_reqwidth()) // 2)}"
+                      f"+{py + max(0, (ph - self.winfo_reqheight()) // 3)}")
 
-    def _label(self, parent, text, top=14):
-        return tk.Label(parent, text=text, bg=self.c["bg"] if parent is self._outer else self.c["surface"],
-                        fg=self.c["text2"], font=f(9, "bold"), anchor="w")
+    def _label(self, parent, text):
+        return tk.Label(parent, text=text, bg=self.c["bg"], fg=self.c["text2"],
+                        font=f(9, "bold"), anchor="w")
 
     def _entry(self, parent, textvariable):
-        wrap = tk.Frame(parent, bg=self.c["surface2"], highlightthickness=1,
-                        highlightbackground=self.c["border"], highlightcolor=self.c["border"])
-        entry = tk.Entry(wrap, textvariable=textvariable, bg=self.c["surface2"],
-                         fg=self.c["text"], insertbackground=self.c["text"],
-                         relief="flat", bd=0, font=f(11), highlightthickness=0)
-        entry.pack(fill="x", padx=11, pady=9)
-        entry.bind("<FocusIn>", lambda _e: wrap.configure(highlightbackground=self.c["primary"]))
-        entry.bind("<FocusOut>", lambda _e: wrap.configure(highlightbackground=self.c["border"]))
+        c = self.c
+        wrap = tk.Frame(parent, bg=c["surface2"], highlightthickness=1,
+                        highlightbackground=c["border"], highlightcolor=c["border"])
+        entry = tk.Entry(wrap, textvariable=textvariable, bg=c["surface2"],
+                         fg=c["text"], insertbackground=c["text"], relief="flat",
+                         bd=0, font=f(11), highlightthickness=0,
+                         selectbackground=c["primary"], selectforeground="#FFFFFF")
+        entry.pack(fill="x", padx=12, pady=10)
+        entry.bind("<FocusIn>", lambda _e=None: wrap.configure(highlightbackground=c["primary"]))
+        entry.bind("<FocusOut>", lambda _e=None: wrap.configure(highlightbackground=c["border"]))
         return wrap, entry
 
     # -- build -------------------------------------------------------
     def _build(self, is_edit):
         c = self.c
-        outer = tk.Frame(self, bg=c["bg"], padx=24, pady=20)
+        outer = tk.Frame(self, bg=c["bg"], padx=26, pady=22)
         outer.pack(fill="both", expand=True)
-        self._outer = outer
 
         header = tk.Frame(outer, bg=c["bg"])
         header.pack(fill="x")
-
-        tile = tk.Canvas(header, width=40, height=40, bg=c["bg"], highlightthickness=0, bd=0)
+        tile = tk.Canvas(header, width=42, height=42, bg=c["bg"], highlightthickness=0, bd=0)
         tile.pack(side="left")
-        rrect(tile, 0, 0, 40, 40, 12, fill=c["primary_soft"])
-        draw_icon(tile, "pencil" if is_edit else "plus", 20, 20, size=19, color=c["primary_l"], width=2)
+        rrect(tile, 0, 0, 42, 42, 12, fill=c["primary_soft"])
+        rrect(tile, 0, 0, 42, 42, 12, outline=mix(c["primary"], c["bg"], 0.5), width=1)
+        draw_icon(tile, "pencil" if is_edit else "plus", 21, 21, size=20,
+                  color=c["primary_l"], width=2)
 
         title_box = tk.Frame(header, bg=c["bg"])
-        title_box.pack(side="left", padx=12)
+        title_box.pack(side="left", padx=13)
         tk.Label(title_box, text="Edit habit" if is_edit else "New habit",
-                 bg=c["bg"], fg=c["text"], font=f(15, "bold"), anchor="w").pack(anchor="w")
-        tk.Label(title_box, text="Small, repeatable, and yours." if not is_edit else "Update the details of this habit.",
-                 bg=c["bg"], fg=c["text2"], font=f(9), anchor="w").pack(anchor="w")
+                 bg=c["bg"], fg=c["text"], font=f(16, "bold"),
+                 anchor="w").pack(anchor="w")
+        tk.Label(title_box,
+                 text="Update the details of this habit." if is_edit
+                 else "Small, repeatable, and yours.",
+                 bg=c["bg"], fg=c["text2"], font=f(10), anchor="w").pack(anchor="w")
+        IconButton(header, self.app, "close", command=self.destroy, size=30,
+                   icon_size=15, bg=c["bg"]).pack(side="right", pady=5)
 
-        close = IconButton(header, self.app, "close", command=self.destroy,
-                           size=30, icon_size=15, bg=c["bg"])
-        close.pack(side="right", pady=4)
-
-        divider(outer, self.app, pady=(16, 6))
+        hairline(outer, self.app, pady=(16, 4))
 
         body = tk.Frame(outer, bg=c["bg"])
         body.pack(fill="both", expand=True)
 
-        # Name
-        self._label(body, "Habit name").pack(fill="x", pady=(8, 5))
+        self._label(body, "Habit name").pack(fill="x", pady=(10, 6))
         self.v_name = tk.StringVar()
         name_wrap, self.e_name = self._entry(body, self.v_name)
         name_wrap.pack(fill="x")
-        self.lbl_error = tk.Label(body, text="", bg=c["bg"], fg=c["danger"], font=f(9), anchor="w")
-        self.lbl_error.pack(fill="x")
+        self.lbl_error = tk.Label(body, text="", bg=c["bg"], fg=c["danger"],
+                                  font=f(9), anchor="w")
+        self.lbl_error.pack(fill="x", pady=(2, 0))
 
-        # Category
-        self._label(body, "Category").pack(fill="x", pady=(8, 5))
+        self._label(body, "Category").pack(fill="x", pady=(10, 6))
         cat_grid = tk.Frame(body, bg=c["bg"])
         cat_grid.pack(fill="x")
         self.v_cat = tk.StringVar(value="Other")
         self._cat_chips = []
-        for index, (category, colour) in enumerate(CATEGORIES.items()):
-            chip = ChoiceChip(cat_grid, self.app, category, color=colour, dot=True,
-                              bg=c["bg"], height=28,
+        for index, category in enumerate(CATEGORIES):
+            chip = ChoiceChip(cat_grid, self.app, category,
+                              color=cat_color(category, c), dot=True, bg=c["bg"],
+                              height=30,
                               command=lambda name: self._select_category(name))
-            chip.grid(row=index // 4, column=index % 4, padx=(0, 6), pady=3, sticky="w")
+            chip.grid(row=index // 4, column=index % 4, padx=(0, 8), pady=4, sticky="w")
             self._cat_chips.append(chip)
-        self._select_category("Other")
 
-        # Target + recurrence
         row = tk.Frame(body, bg=c["bg"])
         row.pack(fill="x", pady=(6, 0))
         left = tk.Frame(row, bg=c["bg"])
-        left.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        left.pack(side="left", fill="x", expand=True, padx=(0, 12))
         right = tk.Frame(row, bg=c["bg"])
         right.pack(side="left", fill="x", expand=True)
 
-        self._label(left, "Daily target (optional)").pack(fill="x", pady=(8, 5))
+        self._label(left, "Daily target (optional)").pack(fill="x", pady=(10, 6))
         self.v_target = tk.StringVar()
         target_wrap, _target_entry = self._entry(left, self.v_target)
         target_wrap.pack(fill="x")
 
-        self._label(right, "Repeat").pack(fill="x", pady=(8, 5))
+        self._label(right, "Repeat").pack(fill="x", pady=(10, 6))
         self.v_rec = tk.StringVar(value="Daily")
-        self.combo = ttk.Combobox(right, textvariable=self.v_rec, values=RECURRENCE_OPTIONS,
-                                  state="readonly", style="HF.TCombobox", font=f(10))
-        self.combo.pack(fill="x", ipady=2)
-        self.combo.bind("<<ComboboxSelected>>", lambda _e: self._sync_custom_days())
+        self.combo = ttk.Combobox(right, textvariable=self.v_rec,
+                                  values=RECURRENCE_OPTIONS, state="readonly",
+                                  style="HF.TCombobox", font=f(10))
+        self.combo.pack(fill="x", ipady=3)
+        self.combo.bind("<<ComboboxSelected>>", lambda _e=None: self._sync_custom_days())
 
-        # Custom weekdays (only for "Custom Days")
         self.days_row = tk.Frame(body, bg=c["bg"])
         self.day_vars = []
         self._day_chips = []
         for index, day in enumerate(WEEKDAY_NAMES):
             var = tk.BooleanVar()
             self.day_vars.append(var)
-            chip = ChoiceChip(self.days_row, self.app, day, bg=c["bg"], height=28, width=52,
+            chip = ChoiceChip(self.days_row, self.app, day, bg=c["bg"], height=28,
+                              width=54,
                               command=lambda name, i=index: self._toggle_day(i))
-            chip.grid(row=0, column=index, padx=(0, 4), pady=2)
+            chip.grid(row=0, column=index, padx=(0, 5), pady=2)
             self._day_chips.append(chip)
 
-        # Notes
-        self._label(body, "Notes (optional)").pack(fill="x", pady=(10, 5))
+        self._label(body, "Notes (optional)").pack(fill="x", pady=(12, 6))
         notes_wrap = tk.Frame(body, bg=c["surface2"], highlightthickness=1,
                               highlightbackground=c["border"])
         notes_wrap.pack(fill="x")
         self.t_notes = tk.Text(notes_wrap, height=3, bg=c["surface2"], fg=c["text"],
                                insertbackground=c["text"], relief="flat", bd=0,
-                               font=f(10), wrap="word", padx=9, pady=8)
+                               font=f(10), wrap="word", padx=10, pady=9,
+                               highlightthickness=0,
+                               selectbackground=c["primary"], selectforeground="#FFFFFF")
         self.t_notes.pack(fill="x")
-        self.t_notes.bind("<FocusIn>", lambda _e: notes_wrap.configure(highlightbackground=c["primary"]))
-        self.t_notes.bind("<FocusOut>", lambda _e: notes_wrap.configure(highlightbackground=c["border"]))
+        self.t_notes.bind("<FocusIn>",
+                          lambda _e=None: notes_wrap.configure(highlightbackground=c["primary"]))
+        self.t_notes.bind("<FocusOut>",
+                          lambda _e=None: notes_wrap.configure(highlightbackground=c["border"]))
 
-        # Pin
         pin_row = tk.Frame(body, bg=c["bg"])
-        pin_row.pack(fill="x", pady=(14, 0))
+        pin_row.pack(fill="x", pady=(16, 0))
         self.v_pin = tk.BooleanVar(value=False)
-        switch = Switch(pin_row, self.app, value=False, bg=c["bg"],
-                        command=lambda value: self.v_pin.set(value))
-        switch.pack(side="left")
+        Switch(pin_row, self.app, value=False, bg=c["bg"],
+               command=lambda value: self.v_pin.set(value)).pack(side="left")
         pin_text = tk.Frame(pin_row, bg=c["bg"])
-        pin_text.pack(side="left", padx=10)
+        pin_text.pack(side="left", padx=12)
         tk.Label(pin_text, text="Pin to top", bg=c["bg"], fg=c["text"],
                  font=f(10, "bold"), anchor="w").pack(anchor="w")
         tk.Label(pin_text, text="Keep this habit at the top of today's list",
                  bg=c["bg"], fg=c["text3"], font=f(9), anchor="w").pack(anchor="w")
 
-        # Footer
-        divider(outer, self.app, pady=(18, 12))
+        hairline(outer, self.app, pady=(18, 12))
+
         footer = tk.Frame(outer, bg=c["bg"])
         footer.pack(fill="x")
         HoverButton(footer, self.app, "Save habit", command=self._save, icon="check",
                     kind="primary", bg=c["bg"], height=38, padx=18).pack(side="right")
-        HoverButton(footer, self.app, "Cancel", command=self.destroy, kind="soft",
+        HoverButton(footer, self.app, "Cancel", command=self.destroy, kind="ghost",
                     bg=c["bg"], height=38, padx=16).pack(side="right", padx=(0, 8))
-        tk.Label(footer, text="Enter to save  ·  Esc to cancel", bg=c["bg"],
+        tk.Label(footer, text="Enter to save   ·   Esc to cancel", bg=c["bg"],
                  fg=c["text3"], font=f(9)).pack(side="left")
 
     # -- state -------------------------------------------------------
@@ -2040,11 +2688,6 @@ class TaskDialog(tk.Toplevel):
             self._day_chips[index].set_selected(var.get())
         self.combo.set(self.v_rec.get())
         self._sync_custom_days()
-        for widget in self.winfo_children():
-            for child in widget.winfo_children():
-                pass
-        # keep the pin switch in sync with stored state
-        self.v_pin.set(bool(task.get("pinned", False)))
         self.e_name.focus_set()
         self.e_name.icursor("end")
 
@@ -2061,10 +2704,11 @@ class TaskDialog(tk.Toplevel):
             self.e_name.focus_set()
             return
         recurrence = self.v_rec.get()
-        recurrence_days = [i for i, var in enumerate(self.day_vars) if var.get()] \
-            if recurrence == "Custom Days" else []
+        recurrence_days = ([i for i, var in enumerate(self.day_vars) if var.get()]
+                           if recurrence == "Custom Days" else [])
         if recurrence == "Custom Days" and not recurrence_days:
-            self.lbl_error.configure(text="Pick at least one weekday, or choose another repeat option.")
+            self.lbl_error.configure(
+                text="Pick at least one weekday, or choose another repeat option.")
             return
         self.lbl_error.configure(text="")
         self.result = {
@@ -2077,14 +2721,21 @@ class TaskDialog(tk.Toplevel):
             "pinned": bool(self.v_pin.get()),
         }
         self.destroy()
+
+
 # ==================================================================
 # HABIT ROW
 # ==================================================================
 class HabitRow(Card):
-    """A single habit, rendered as an interactive card."""
+    """A single habit rendered as a clean, aligned row.
+
+    Layout: completion control | name + metadata | actions.  Completed
+    habits keep their full readability - no strikethrough - and change
+    state through the check, the border and a small "Done" pill.
+    """
 
     def __init__(self, parent, app, task, done=False, stats=None, on_toggle=None,
-                 on_edit=None, on_delete=None, compact=False):
+                 on_edit=None, on_delete=None, compact=False, show_actions=True):
         self.app = app
         self.task = task
         self._done = bool(done)
@@ -2093,215 +2744,666 @@ class HabitRow(Card):
         self._on_edit = on_edit
         self._on_delete = on_delete
         self._compact = compact
-        self._hover = False
-        color = CATEGORIES.get(task.get("category"), app.c["primary"])
-        super().__init__(
-            parent, app,
-            radius=12,
-            padding=(12, 9) if compact else (14, 11),
-            accent=color,
-            bg=parent.cget("bg"),
-        )
-        self._category_color = color
-        self._build()
+        self._color = cat_color(task.get("category"), app.c)
+        self._done_color = app.c["success"]
+        pad = (14, 10) if compact else (16, 13)
+        super().__init__(parent, app, radius=14, pad=pad,
+                         accent=self._done_color if self._done else self._color,
+                         bg=parent.cget("bg"), hoverable=True)
+        self._build(show_actions)
+        self._apply_state(animate=False)
 
     # -- construction -------------------------------------------------
-    def _build(self):
+    def _build(self, show_actions):
         c = self.c
         body = self.body
         body.columnconfigure(1, weight=1)
+        name_size = 11 if self._compact else 12
 
         self._check = CheckCircle(
-            body, self.app, checked=self._done, color=self._category_color,
-            command=self._handle_toggle, size=24 if self._compact else 26, bg=c["card"],
+            body, self.app, checked=self._done, color=self._done_color,
+            command=self._toggle, size=26, bg=c["card"],
         )
-        self._check.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="w")
+        self._check.grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 14))
 
-        name_row = tk.Frame(body, bg=c["card"])
-        name_row.grid(row=0, column=1, sticky="ew")
-
-        self._name = tk.Label(
-            name_row, text=self.task["name"], bg=c["card"],
-            fg=c["text"], font=f(11 if not self._compact else 10, "bold"), anchor="w",
-        )
+        title = tk.Frame(body, bg=c["card"])
+        title.grid(row=0, column=1, sticky="ew")
+        self._name = tk.Label(title, text=self.task["name"], bg=c["card"], fg=c["text"],
+                              font=f(name_size, "bold"), anchor="w")
         self._name.pack(side="left")
         if self.task.get("pinned"):
-            pin = tk.Canvas(name_row, width=16, height=16, bg=c["card"],
+            pin = tk.Canvas(title, width=16, height=16, bg=c["card"],
                             highlightthickness=0, bd=0)
-            pin.pack(side="left", padx=(6, 0))
-            draw_icon(pin, "pin", 8, 8, size=13, color=c["text3"], width=1.6)
+            pin.pack(side="left", padx=(7, 0))
+            draw_icon(pin, "pin", 8, 8, size=12, color=c["text3"], width=1.6)
 
-        streak = (self._stats or {}).get("streak", 0)
-        self._streak_label = None
-        if streak > 0:
-            chip_frame = tk.Frame(name_row, bg=mix(c["warning"], c["card"], 0.86), padx=6, pady=1)
-            chip_frame.pack(side="left", padx=(8, 0))
-            flame = tk.Canvas(chip_frame, width=12, height=12, bg=chip_frame.cget("bg"),
-                              highlightthickness=0, bd=0)
-            flame.pack(side="left", padx=(0, 3))
-            draw_icon(flame, "flame", 6, 6, size=11, color=c["warning"], width=1.6)
-            self._streak_label = tk.Label(
-                chip_frame, text=f"{streak}", bg=chip_frame.cget("bg"),
-                fg=c["warning"], font=f(8, "bold"),
-            )
-            self._streak_label.pack(side="left")
+        self._done_pill = None
+        streak = int((self._stats or {}).get("streak", 0) or 0)
+        if streak > 0 and not self._compact:
+            self._streak_pill = Pill(title, self.app, f"{streak}d", color=c["warning"],
+                                     icon="flame", bg=c["card"], height=20, size=8)
+            self._streak_pill.pack(side="left", padx=(8, 0))
+        else:
+            self._streak_pill = None
 
         actions = tk.Frame(body, bg=c["card"])
-        actions.grid(row=0, column=2, rowspan=2, sticky="e", padx=(8, 0))
-        if self._on_edit:
-            IconButton(actions, self.app, "pencil", command=lambda: self._on_edit(self.task),
-                       size=28, icon_size=14, bg=c["card"], color=c["text3"],
+        actions.grid(row=0, column=2, rowspan=2, sticky="e", padx=(10, 0))
+        if show_actions and self._on_edit:
+            IconButton(actions, self.app, "pencil",
+                       command=lambda: self._on_edit(self.task), size=28,
+                       icon_size=14, bg=c["card"], color=c["text3"],
                        hover_color=c["primary_l"]).pack(side="left")
-        if self._on_delete:
-            IconButton(actions, self.app, "trash", command=lambda: self._on_delete(self.task),
-                       size=28, icon_size=14, bg=c["card"], color=c["text3"],
+        if show_actions and self._on_delete:
+            IconButton(actions, self.app, "trash",
+                       command=lambda: self._on_delete(self.task), size=28,
+                       icon_size=14, bg=c["card"], color=c["text3"],
                        hover_color=c["danger"]).pack(side="left", padx=(2, 0))
 
         meta = tk.Frame(body, bg=c["card"])
-        meta.grid(row=1, column=1, sticky="ew", pady=(3, 0))
-        Chip(meta, self.app, self.task.get("category", "Other"),
-             color=self._category_color, bg=c["card"]).pack(side="left", padx=(0, 6))
+        meta.grid(row=1, column=1, columnspan=2 if not show_actions else 1,
+                  sticky="ew", pady=(7, 0))
+        Pill(meta, self.app, self.task.get("category", "Other"), dot=True,
+             color=self._color, bg=c["card"], height=20, size=8).pack(side="left",
+                                                                     padx=(0, 6))
         if self.task.get("daily_target"):
-            Chip(meta, self.app, self.task["daily_target"], color=c["text2"], filled=False,
-                 bg=c["card"]).pack(side="left", padx=(0, 6))
-        if self.task.get("recurrence") and self.task["recurrence"] != "Daily":
-            Chip(meta, self.app, self.task["recurrence"], color=c["text2"], filled=False,
-                 bg=c["card"]).pack(side="left", padx=(0, 6))
-        if self.task.get("notes") and not self._compact:
-            note = self.task["notes"]
-            if len(note) > 64:
-                note = note[:64].rstrip() + "…"
-            tk.Label(meta, text=note, bg=c["card"], fg=c["text3"], font=f(8),
-                     anchor="w").pack(side="left", padx=(2, 0))
+            Pill(meta, self.app, self.task["daily_target"], color=c["text2"],
+                 icon="clock", bg=c["card"], height=20, size=8).pack(side="left",
+                                                                    padx=(0, 6))
+        if self.task.get("recurrence") and self.task["recurrence"] != "Daily" \
+                and not self._compact:
+            Pill(meta, self.app, self.task["recurrence"], color=c["text2"],
+                 bg=c["card"], height=20, size=8).pack(side="left", padx=(0, 6))
 
-        bind_tree(self, "<Enter>", self._on_enter, skip=("Button",))
-        bind_tree(self, "<Leave>", self._on_leave, skip=("Button",))
-        self._apply_state()
+        self._notes = None
+        note = (self.task.get("notes") or "").strip()
+        if note and not self._compact:
+            self._notes_font = tkfont.Font(font=f(9))
+            self._notes = tk.Label(meta, text="", bg=c["card"], fg=c["text3"],
+                                   font=f(9), anchor="w")
+            self._notes.pack(side="left", fill="x", expand=True, padx=(2, 0))
+            self._notes.bind("<Configure>", self._on_notes_configure)
+        self._notes_text = note
+
+    def _on_notes_configure(self, event):
+        if self._notes is None:
+            return
+        text = elide("·  " + self._notes_text, self._notes_font, max(20, event.width - 2))
+        if self._notes.cget("text") != text:
+            self._notes.configure(text=text)
 
     # -- state --------------------------------------------------------
-    def _apply_state(self):
+    def _apply_state(self, animate=False):
         c = self.c
-        done = self._done
-        if done:
-            self._name.configure(fg=c["text3"], font=f(10, "bold", "overstrike"))
-            self._border = mix(c["border"], c["success"], 0.45)
+        self._check.set_checked(self._done, animate=animate)
+        self._name.configure(fg=c["text2"] if self._done else c["text"])
+        self.set_accent(self._done_color if self._done else self._color)
+        self.set_border(mix(c["border"], c["success"], 0.4) if self._done else c["border"])
+        self._base_border = self._border
+        if self._done:
+            if self._done_pill is None:
+                self._done_pill = Pill(self._name.master, self.app, "Done",
+                                       color=c["success"], bg=c["card"], height=20,
+                                       size=8)
+            self._done_pill.pack(side="left", padx=(8, 0), before=None)
+            if self._streak_pill is not None:
+                self._streak_pill.pack_forget()
+                self._streak_pill.pack(side="left", padx=(8, 0), after=self._done_pill)
         else:
-            self._name.configure(fg=c["text"], font=f(11 if not self._compact else 10, "bold"))
-            self._border = c["border"]
-        try:
-            self._draw(self.canvas.winfo_width(), self.canvas.winfo_height())
-        except tk.TclError:
-            pass
+            if self._done_pill is not None:
+                self._done_pill.pack_forget()
+            if self._streak_pill is not None:
+                self._streak_pill.pack(side="left", padx=(8, 0))
 
-    def set_done(self, done, stats=None):
+    def set_done(self, done, stats=None, animate=True):
         self._done = bool(done)
         if stats is not None:
             self._stats = stats
-        self._check.set_checked(self._done)
-        self._apply_state()
-        if self._streak_label is not None:
-            streak = (self._stats or {}).get("streak", 0)
-            self._streak_label.configure(text=f"{streak}")
+        self._apply_state(animate=animate)
+        streak = int((self._stats or {}).get("streak", 0) or 0)
+        if self._streak_pill is not None:
+            for child in self._streak_pill.master.winfo_children():
+                pass
+        if self._streak_pill is not None and streak > 0:
+            self._rebuild_streak_pill(streak)
 
-    def _handle_toggle(self):
-        if self._on_toggle:
-            new_state = self._on_toggle(self.task, self._check)
-            self.set_done(new_state, self.app.dm.habit_stats(self.task, 30))
-
-    # -- hover --------------------------------------------------------
-    def _on_enter(self, _event=None):
-        if self._hover:
-            return
-        self._hover = True
-        self.set_glow(True)
-
-    def _on_leave(self, _event=None):
-        self.after(70, self._check_leave)
-
-    def _check_leave(self):
+    def _rebuild_streak_pill(self, streak):
+        pill = self._streak_pill
         try:
-            under = self.app.root.winfo_containing(*self.app.root.winfo_pointerxy())
-        except (tk.TclError, KeyError):
-            under = None
-        widget = under
-        while widget is not None:
-            if widget is self:
+            pill.destroy()
+        except tk.TclError:
+            return
+        self._streak_pill = Pill(pill.master, self.app, f"{streak}d",
+                                 color=self.c["warning"], icon="flame",
+                                 bg=self.c["card"], height=20, size=8)
+        self._streak_pill.pack(side="left", padx=(8, 0))
+
+    def _toggle(self):
+        if not self._on_toggle:
+            return
+        new_state = self._on_toggle(self.task)
+        self.set_done(new_state, stats=self.app.dm.habit_stats(self.task, 30))
+
+# ==================================================================
+# VIEW HELPERS
+# ==================================================================
+class ViewHelpersMixin:
+    """Shared page scaffolding so every view uses the same rhythm."""
+
+    def _page(self, subtitle=None):
+        c = self.c
+        scroll = ScrollableFrame(self.content, c["bg"], padding=0,
+                                 track=mix(c["bg"], "#FFFFFF", 0.05),
+                                 thumb=mix(c["bg"], "#FFFFFF", 0.18))
+        scroll.pack(fill="both", expand=True)
+        page = tk.Frame(scroll.inner, bg=c["bg"])
+        page.pack(fill="both", expand=True)
+        return scroll, page
+
+    def _page_header(self, page, title, subtitle=None, action=None):
+        """Title block. Returns the header frame."""
+        c = self.c
+        header = tk.Frame(page, bg=c["bg"])
+        header.pack(fill="x", padx=PAGE_PAD, pady=(28, 0))
+        text = tk.Frame(header, bg=c["bg"])
+        text.pack(side="left")
+        tk.Label(text, text=title, bg=c["bg"], fg=c["text"], font=f(26, "bold"),
+                 anchor="w").pack(anchor="w")
+        if subtitle:
+            tk.Label(text, text=subtitle, bg=c["bg"], fg=c["text2"], font=f(11),
+                     anchor="w").pack(anchor="w", pady=(3, 0))
+        if action is not None:
+            action(header)
+        return header
+
+    def _section_title(self, parent, text, meta=None, padx=PAGE_PAD, pady=(26, 10)):
+        c = self.c
+        row = tk.Frame(parent, bg=c["bg"])
+        row.pack(fill="x", padx=padx, pady=pady)
+        tk.Label(row, text=text, bg=c["bg"], fg=c["text"], font=f(13, "bold"),
+                 anchor="w").pack(side="left")
+        if meta:
+            tk.Label(row, text=meta, bg=c["bg"], fg=c["text3"], font=f(10),
+                     anchor="e").pack(side="right")
+        return row
+
+    def _empty_state(self, parent, bg, title, description, button_text=None,
+                     command=None, icon="spark"):
+        c = self.c
+        box = tk.Frame(parent, bg=bg)
+        box.pack(fill="x", pady=26)
+        canvas = tk.Canvas(box, width=54, height=54, bg=bg, highlightthickness=0, bd=0)
+        canvas.pack()
+        rrect(canvas, 0, 0, 54, 54, 16, fill=mix(c["primary"], bg, 0.86))
+        draw_icon(canvas, icon, 27, 27, size=23, color=c["primary_l"], width=1.7)
+        tk.Label(box, text=title, bg=bg, fg=c["text"], font=f(12, "bold")).pack(pady=(10, 3))
+        tk.Label(box, text=description, bg=bg, fg=c["text2"], font=f(10),
+                 wraplength=360, justify="center").pack()
+        if button_text and command:
+            HoverButton(box, self, button_text, command=command, icon="plus",
+                        kind="soft", bg=bg, height=34, font_size=9).pack(pady=(14, 0))
+
+    def _responsive_grid(self, container, widgets, min_width, gap=12, uniform="tile",
+                         max_cols=None):
+        """Re-flow tiles into as many columns as the width allows."""
+        state = {"cols": 0}
+
+        def apply(_event=None):
+            try:
+                width = container.winfo_width()
+            except tk.TclError:
                 return
-            widget = getattr(widget, "master", None)
-        self._hover = False
-        self.set_glow(False)
+            if width <= 1:
+                return
+            limit = min(len(widgets), max_cols or len(widgets))
+            fit = max(1, min(limit, int((width + gap) // (min_width + gap)) or 1))
+            # prefer a column count that divides the tiles evenly, so the last
+            # row is never a lonely orphan tile.
+            cols = fit
+            for candidate in range(fit, 0, -1):
+                if len(widgets) % candidate == 0:
+                    cols = candidate
+                    break
+            if cols == state["cols"]:
+                return
+            state["cols"] = cols
+            for widget in widgets:
+                widget.grid_forget()
+            for column in range(8):
+                container.columnconfigure(column, weight=0, uniform="")
+            for column in range(cols):
+                container.columnconfigure(column, weight=1, uniform=uniform)
+            for index, widget in enumerate(widgets):
+                row, column = divmod(index, cols)
+                widget.grid(row=row, column=column, sticky="nsew",
+                            padx=(0 if column == 0 else gap, 0),
+                            pady=(0 if row == 0 else gap, 0))
+
+        container.bind("<Configure>", apply)
+        container.after(16, apply)
 
 
 # ==================================================================
-# VIEW - HABITS
+# DASHBOARD
 # ==================================================================
-class HabitsViewMixin:
-    """Habits list with search, category filters and empty states."""
+class DashboardViewMixin(ViewHelpersMixin):
+
+    def _greeting(self):
+        hour = datetime.now().hour
+        if hour < 5:
+            return "Late night focus"
+        if hour < 12:
+            return "Good morning"
+        if hour < 17:
+            return "Good afternoon"
+        if hour < 22:
+            return "Good evening"
+        return "Winding down"
+
+    def _score_status(self, pct):
+        if pct >= 1.0:
+            return "Flawless day", self.c["success"]
+        if pct >= 0.8:
+            return "Elite progress", self.c["primary_l"]
+        if pct >= 0.5:
+            return "Strong momentum", self.c["primary"]
+        if pct > 0:
+            return "Warming up", self.c["warning"]
+        return "Ready when you are", self.c["text2"]
+
+    def _achievements(self):
+        dm = self.dm
+        best = dm.best_streak()
+        total = dm.total_checkins()
+        perfect = dm.perfect_days_total()
+        _xp, level, _lname, _in, _for = dm.get_xp_info()
+        consistency = dm.consistency(30)
+        return [
+            {"icon": "spark", "name": "First light", "desc": "Complete your first habit",
+             "earned": total >= 1, "progress": f"{min(total, 1)}/1", "fraction": min(total, 1)},
+            {"icon": "flame", "name": "Week of fire", "desc": "7 perfect days in a row",
+             "earned": best >= 7, "progress": f"{min(best, 7)}/7", "fraction": best / 7},
+            {"icon": "trophy", "name": "Perfect day", "desc": "Finish every habit in a day",
+             "earned": perfect >= 1, "progress": f"{min(perfect, 1)}/1",
+             "fraction": min(perfect, 1)},
+            {"icon": "target", "name": "Steady month", "desc": "80% consistency over 30 days",
+             "earned": consistency >= 0.8 and total >= 20,
+             "progress": f"{int(round(consistency * 100))}%",
+             "fraction": min(1.0, consistency / 0.8)},
+            {"icon": "bolt", "name": "Level 5", "desc": "Reach level five",
+             "earned": level >= 5, "progress": f"L{level}/5", "fraction": level / 5},
+            {"icon": "layers", "name": "Century", "desc": "100 habit check-ins",
+             "earned": total >= 100, "progress": f"{min(total, 100)}/100",
+             "fraction": min(1.0, total / 100)},
+        ]
+
+    def _view_dashboard(self):
+        c = self.c
+        scroll, page = self._page()
+        self._dashboard = {}
+        self._dashboard_rows = {}
+
+        tasks = self.dm.get_scheduled_today()
+        done_ids = self.dm.get_completed_today()
+        total = len(tasks)
+        done = sum(1 for t in tasks if t["id"] in done_ids)
+        pct = done / total if total else 0.0
+        streak = self.dm.calculate_streak()
+
+        # -- header --------------------------------------------------
+        today = date.today()
+
+        def header_action(parent):
+            HoverButton(parent, self, "New habit", command=self._open_add_task,
+                        icon="plus", kind="primary", bg=c["bg"], height=38,
+                        padx=18).pack(side="right")
+
+        self._page_header(
+            page, self._greeting(),
+            f"{WEEKDAY_FULL[today.weekday()]}, {today.strftime('%d %B %Y')}  ·  "
+            f"{self._day_phrase(done, total)}",
+            header_action,
+        )
+
+        # -- hero ----------------------------------------------------
+        hero = Card(page, self, radius=CARD_RADIUS + 2, pad=(24, 20),
+                    border=mix(c["border"], c["primary"], 0.30))
+        hero.pack(fill="x", padx=PAGE_PAD, pady=(SECTION_GAP + 4, 0))
+        hero.body.columnconfigure(1, weight=1)
+
+        ring = ProgressRing(hero.body, self, size=142, thickness=10, pct=pct,
+                            bg=c["card"], caption="of today's habits")
+        ring.grid(row=0, column=0, rowspan=3, sticky="w", padx=(0, 30))
+
+        tk.Label(hero.body, text="TODAY'S PROGRESS", bg=c["card"], fg=c["cyan"],
+                 font=(FONT_FAMILY, 9, "bold"), anchor="w").grid(
+            row=0, column=1, sticky="w")
+
+        count_row = tk.Frame(hero.body, bg=c["card"])
+        count_row.grid(row=1, column=1, sticky="ew", pady=(4, 0))
+        count_label = tk.Label(count_row,
+                               text=f"{done} of {total}" if total else "No habits yet",
+                               bg=c["card"], fg=c["text"], font=f(24, "bold"),
+                               anchor="w")
+        count_label.pack(side="left")
+        tk.Label(count_row, text="completed" if total else "",
+                 bg=c["card"], fg=c["text2"], font=f(11), anchor="w").pack(
+            side="left", padx=(8, 0), pady=(8, 0))
+        status_text, status_color = self._score_status(pct)
+        status_label = tk.Label(count_row, text=status_text, bg=c["card"],
+                                fg=status_color, font=f(10, "bold"))
+        status_label.pack(side="left", padx=(16, 0), pady=(9, 0))
+
+        segments = SegmentBar(hero.body, self, total=total, done=done, height=7,
+                              bg=c["card"])
+        segments.grid(row=2, column=1, sticky="ew", pady=(10, 0))
+        segments.configure(width=1)
+
+        detail_row = tk.Frame(hero.body, bg=c["card"])
+        detail_row.grid(row=3, column=1, sticky="ew", pady=(9, 0))
+        remaining = max(0, total - done)
+        detail_label = tk.Label(
+            detail_row,
+            text=(f"{remaining} habit{'s' if remaining != 1 else ''} remaining  ·  "
+                  f"+{done * XP_PER_TASK} XP earned today") if total
+            else "Add your first habit to start today's score",
+            bg=c["card"], fg=c["text3"], font=f(10), anchor="w")
+        detail_label.pack(side="left")
+
+        actions = tk.Frame(hero.body, bg=c["card"])
+        actions.grid(row=4, column=1, sticky="w", pady=(16, 0))
+        primary_action = HoverButton(actions, self, "Continue today's habits",
+                                     command=lambda: self._show("Habits"),
+                                     icon="arrow-right", kind="primary",
+                                     bg=c["card"], height=38, padx=18)
+        primary_action.pack(side="left")
+        mark_all = HoverButton(actions, self, "Complete all", kind="ghost",
+                               command=self._shortcut_mark_all, icon="check",
+                               bg=c["card"], height=38, font_size=10)
+        mark_all.pack(side="left", padx=(6, 0))
+        mark_all.set_enabled(bool(total) and done < total)
+
+        self._dashboard.update({
+            "ring": ring, "count": count_label, "status": status_label,
+            "segments": segments, "detail": detail_label, "mark_all": mark_all,
+            "total": total, "done": done,
+        })
+
+        # -- metric strip -------------------------------------------
+        week = self.dm.get_week_pcts()
+        week_avg = round(sum(week) / 7) if week else 0
+        _xp, level, level_name, xp_in, xp_for = self.dm.get_xp_info()
+        best = self.dm.best_streak()
+
+        strip = tk.Frame(page, bg=c["bg"])
+        strip.pack(fill="x", padx=PAGE_PAD, pady=(SECTION_GAP - 2, 0))
+        tiles = [
+            StatTile(strip, self, "flame", c["warning"], str(streak),
+                     "Day streak", f"best {best}", bg=c["bg"]),
+            StatTile(strip, self, "trophy", c["primary_l"], str(best),
+                     "Best streak", "personal record", bg=c["bg"]),
+            StatTile(strip, self, "chart", c["accent"], f"{week_avg}%",
+                     "This week", "Mon – Sun", bg=c["bg"]),
+            StatTile(strip, self, "bolt", c["purple_l"], f"L{level}",
+                     "Level", f"{level_name} · {xp_in}/{xp_for} XP", bg=c["bg"]),
+        ]
+        self._responsive_grid(strip, tiles, min_width=190, gap=12, max_cols=4)
+        self._dashboard["tiles"] = {"streak": tiles[0], "week": tiles[2],
+                                    "level": tiles[3]}
+
+        # -- body: habits + week ------------------------------------
+        body = tk.Frame(page, bg=c["bg"])
+        body.pack(fill="both", expand=True, padx=PAGE_PAD, pady=(SECTION_GAP, 0))
+        body.columnconfigure(0, weight=3, uniform="body")
+        body.columnconfigure(1, weight=2, uniform="body")
+
+        focus = Card(body, self, radius=CARD_RADIUS, pad=(20, 18))
+        focus.grid(row=0, column=0, sticky="nsew", padx=(0, SECTION_GAP))
+
+        head = tk.Frame(focus.body, bg=c["card"])
+        head.pack(fill="x")
+        tk.Label(head, text="Today's habits", bg=c["card"], fg=c["text"],
+                 font=f(13, "bold"), anchor="w").pack(side="left")
+        Pill(head, self, f"{done}/{total}" if total else "0", color=c["primary"],
+             bg=c["card"], filled=False, height=22, size=9).pack(side="right")
+        tk.Label(focus.body, text="Pinned habits stay at the top", bg=c["card"],
+                 fg=c["text3"], font=f(9), anchor="w").pack(anchor="w", pady=(3, 12))
+
+        if not tasks:
+            self._empty_state(focus.body, c["card"], "Nothing scheduled today",
+                              "Add a habit, or change a habit's repeat setting to "
+                              "see it here.", "Add a habit", self._open_add_task)
+        else:
+            rows_holder = tk.Frame(focus.body, bg=c["card"])
+            rows_holder.pack(fill="x")
+            for task in tasks[:6]:
+                row = HabitRow(rows_holder, self, task, task["id"] in done_ids,
+                               stats=self.dm.habit_stats(task, 30),
+                               on_toggle=self._toggle_task, compact=False,
+                               show_actions=False)
+                row.pack(fill="x", pady=(0, 8))
+                self._dashboard_rows[task["id"]] = row
+            if len(tasks) > 6:
+                tk.Label(rows_holder, text=f"+{len(tasks) - 6} more habits today",
+                         bg=c["card"], fg=c["text3"], font=f(9), anchor="w").pack(
+                    anchor="w", pady=(2, 0))
+            footer = tk.Frame(focus.body, bg=c["card"])
+            footer.pack(fill="x", pady=(10, 0))
+            view_all = tk.Label(footer, text="Open habit list", bg=c["card"],
+                                fg=c["primary_l"], font=f(10, "bold"), cursor="hand2",
+                                anchor="w")
+            view_all.pack(side="left")
+            view_all.bind("<Button-1>", lambda _e=None: self._show("Habits"))
+            draw_arrow = tk.Canvas(footer, width=16, height=16, bg=c["card"],
+                                   highlightthickness=0, bd=0)
+            draw_arrow.pack(side="left", padx=(4, 0))
+            draw_icon(draw_arrow, "arrow-right", 8, 8, size=13,
+                      color=c["primary_l"], width=1.8)
+
+        right = tk.Frame(body, bg=c["bg"])
+        right.grid(row=0, column=1, sticky="nsew")
+
+        week_card = Card(right, self, radius=CARD_RADIUS, pad=(20, 18))
+        week_card.pack(fill="x")
+        week_head = tk.Frame(week_card.body, bg=c["card"])
+        week_head.pack(fill="x")
+        tk.Label(week_head, text="This week", bg=c["card"], fg=c["text"],
+                 font=f(13, "bold"), anchor="w").pack(side="left")
+        tk.Label(week_head, text=f"{week_avg}% avg", bg=c["card"], fg=c["primary_l"],
+                 font=f(10, "bold"), anchor="e").pack(side="right")
+        labels = [day.strftime("%a") for day in self.dm.get_week_dates()]
+        bars = WeekBars(week_card.body, self, height=170, values=week,
+                        labels=labels, highlight=today.weekday(), bg=c["card"])
+        bars.pack(fill="x", pady=(12, 0))
+        tk.Label(week_card.body, text="Completion rate per day · today highlighted",
+                 bg=c["card"], fg=c["text3"], font=f(9), anchor="w").pack(
+            anchor="w", pady=(8, 0))
+        self._dashboard["bars"] = bars
+
+        # milestones: deliberately not another card, to break the grid up
+        milestones = tk.Frame(right, bg=c["bg"])
+        milestones.pack(fill="x", pady=(SECTION_GAP + 2, 0))
+        milestone_head = tk.Frame(milestones, bg=c["bg"])
+        milestone_head.pack(fill="x")
+        tk.Label(milestone_head, text="Milestones", bg=c["bg"], fg=c["text"],
+                 font=f(13, "bold"), anchor="w").pack(side="left")
+        items = self._achievements()
+        earned_count = sum(1 for item in items if item["earned"])
+        tk.Label(milestone_head, text=f"{earned_count} of {len(items)} earned",
+                 bg=c["bg"], fg=c["text3"], font=f(10), anchor="e").pack(side="right")
+        hairline(milestones, self, pady=(8, 8))
+        self._milestone_holder = tk.Frame(milestones, bg=c["bg"])
+        self._milestone_holder.pack(fill="x")
+        self._render_milestones(self._milestone_holder, limit=4)
+
+        # -- quote ---------------------------------------------------
+        quote, author = self.dm.get_daily_quote()
+        quote_card = Card(page, self, radius=CARD_RADIUS, pad=(22, 16),
+                          border=mix(c["border"], c["purple"], 0.25))
+        quote_card.pack(fill="x", padx=PAGE_PAD, pady=(SECTION_GAP + 4, 28))
+        mark = tk.Canvas(quote_card.body, width=24, height=24, bg=c["card"],
+                         highlightthickness=0, bd=0)
+        mark.pack(side="left", padx=(0, 14))
+        draw_icon(mark, "spark", 12, 12, size=16, color=c["purple_l"], width=1.6)
+        text_box = tk.Frame(quote_card.body, bg=c["card"])
+        text_box.pack(side="left", fill="x", expand=True)
+        tk.Label(text_box, text=f"“{quote}”", bg=c["card"], fg=c["text"],
+                 font=f(11, "normal", "italic"), anchor="w", justify="left",
+                 wraplength=780).pack(anchor="w")
+        tk.Label(text_box, text=author, bg=c["card"], fg=c["text3"], font=f(9),
+                 anchor="w").pack(anchor="w", pady=(3, 0))
+
+    def _day_phrase(self, done, total):
+        if not total:
+            return "no habits scheduled"
+        if done >= total:
+            return "every habit complete"
+        return f"{total - done} habit{'s' if total - done != 1 else ''} left today"
+
+    def _render_milestones(self, parent, limit=None):
+        for child in parent.winfo_children():
+            child.destroy()
+        items = self._achievements()
+        shown = items if limit is None else items[:limit]
+        for item in shown:
+            MilestoneRow(parent, self, item).pack(fill="x", pady=3)
+
+    # -- live updates -------------------------------------------------
+    def _refresh_dashboard_progress(self):
+        state = self._dashboard
+        if not state:
+            return
+        tasks = self.dm.get_scheduled_today()
+        done_ids = self.dm.get_completed_today()
+        total = len(tasks)
+        done = sum(1 for t in tasks if t["id"] in done_ids)
+        pct = done / total if total else 0.0
+        streak = self.dm.calculate_streak()
+        status_text, status_color = self._score_status(pct)
+        remaining = max(0, total - done)
+
+        state["ring"].animate_to(pct, duration=380)
+        state["count"].configure(text=f"{done} of {total}" if total else "No habits yet")
+        state["status"].configure(text=status_text, fg=status_color)
+        state["segments"].set_values(done, total)
+        state["detail"].configure(
+            text=(f"{remaining} habit{'s' if remaining != 1 else ''} remaining  ·  "
+                  f"+{done * XP_PER_TASK} XP earned today") if total
+            else "Add your first habit to start today's score")
+        state["mark_all"].set_enabled(bool(total) and done < total)
+
+        tiles = state.get("tiles") or {}
+        if tiles.get("streak") is not None:
+            tiles["streak"].set_value(str(streak), hint=f"best {self.dm.best_streak()}")
+        week = self.dm.get_week_pcts()
+        week_avg = round(sum(week) / 7) if week else 0
+        if tiles.get("week") is not None:
+            tiles["week"].set_value(f"{week_avg}%")
+        if state.get("bars") is not None:
+            state["bars"].set_values(week, highlight=date.today().weekday())
+        if getattr(self, "_milestone_holder", None) is not None:
+            try:
+                if self._milestone_holder.winfo_exists():
+                    self._render_milestones(self._milestone_holder, limit=4)
+            except tk.TclError:
+                pass
+
+        for task in tasks:
+            row = self._dashboard_rows.get(task["id"])
+            if row is not None:
+                row.set_done(task["id"] in done_ids,
+                             stats=self.dm.habit_stats(task, 30), animate=False)
+        self._draw_streak_chip()
+
+
+# ==================================================================
+# HABITS LIST
+# ==================================================================
+class HabitsViewMixin(ViewHelpersMixin):
 
     def _view_habits(self):
+        # This view does not scroll as a page: the habit list has its own
+        # scroll region and fills the window, so there is no dead space below.
         c = self.c
+        self._task_scroll = None
+        self._habit_rows = {}
+
+        page = tk.Frame(self.content, bg=c["bg"])
+        page.pack(fill="both", expand=True)
+
         tasks = self.dm.get_scheduled_today()
         done_ids = self.dm.get_completed_today()
         done = sum(1 for t in tasks if t["id"] in done_ids)
 
-        toolbar = tk.Frame(self.content, bg=c["bg"])
-        toolbar.pack(fill="x", padx=28, pady=(20, 0))
-        left = tk.Frame(toolbar, bg=c["bg"])
-        left.pack(side="left")
-        self._habit_counts_label = tk.Label(
-            left, text=self._habit_header_text(tasks, done), bg=c["bg"], fg=c["text"],
-            font=f(13, "bold"), anchor="w",
-        )
-        self._habit_counts_label.pack(anchor="w")
-        tk.Label(left, text="Pinned habits stay on top · completed habits dim down",
-                 bg=c["bg"], fg=c["text3"], font=f(9), anchor="w").pack(anchor="w")
+        header = tk.Frame(page, bg=c["bg"])
+        header.pack(fill="x", padx=PAGE_PAD, pady=(26, 0))
+        text = tk.Frame(header, bg=c["bg"])
+        text.pack(side="left")
+        tk.Label(text, text="Habits", bg=c["bg"], fg=c["text"], font=f(26, "bold"),
+                 anchor="w").pack(anchor="w")
+        tk.Label(text, text="Create, edit and complete the routines that run your day",
+                 bg=c["bg"], fg=c["text2"], font=f(11), anchor="w").pack(
+            anchor="w", pady=(3, 0))
+        HoverButton(header, self, "New habit", command=self._open_add_task, icon="plus",
+                    kind="primary", bg=c["bg"], height=38, padx=18).pack(side="right")
 
-        actions = tk.Frame(toolbar, bg=c["bg"])
-        actions.pack(side="right")
-        HoverButton(actions, self, "New habit", command=self._open_add_task, icon="plus",
-                    kind="primary", height=36, bg=c["bg"]).pack(side="left", padx=(8, 0))
-        self._habit_mark_all = HoverButton(
-            actions, self, "Complete all", command=self._shortcut_mark_all, icon="check",
-            kind="soft", height=36, font_size=9, bg=c["bg"],
-        )
-        self._habit_mark_all.pack(side="left", padx=(0, 8))
-        self._habit_mark_all.set_enabled(bool(tasks) and done < len(tasks))
+        toolbar = tk.Frame(page, bg=c["bg"])
+        toolbar.pack(fill="x", padx=PAGE_PAD, pady=(SECTION_GAP + 2, 0))
 
-        search_wrap = tk.Frame(actions, bg=c["surface2"], highlightthickness=1,
-                               highlightbackground=c["border"])
-        search_wrap.pack(side="left", padx=(0, 10))
-        search_icon = tk.Canvas(search_wrap, width=26, height=30, bg=c["surface2"],
+        search_wrap = tk.Frame(toolbar, bg=c["surface2"], width=430, height=40,
+                               highlightthickness=1, highlightbackground=c["border"])
+        search_wrap.pack(side="left")
+        search_wrap.pack_propagate(False)
+        search_icon = tk.Canvas(search_wrap, width=34, height=38, bg=c["surface2"],
                                 highlightthickness=0, bd=0)
-        search_icon.pack(side="left", padx=(6, 0))
-        draw_icon(search_icon, "search", 13, 15, size=14, color=c["text3"], width=1.7)
+        search_icon.pack(side="left", padx=(8, 0))
+        draw_icon(search_icon, "search", 8, 19, size=15, color=c["text3"], width=1.7)
         self._search_entry = tk.Entry(
-            search_wrap, textvariable=self._search_var, bg=c["surface2"], fg=c["text"],
-            insertbackground=c["text"], relief="flat", bd=0, font=f(9), width=20,
-            highlightthickness=0, readonlybackground=c["surface2"],
+            search_wrap, textvariable=self._search_var, bg=c["surface2"],
+            fg=c["text"], insertbackground=c["text"], relief="flat", bd=0,
+            font=f(10), highlightthickness=0, readonlybackground=c["surface2"],
             selectbackground=c["primary"], selectforeground="#FFFFFF",
         )
-        self._search_entry.pack(side="left", padx=(4, 10), pady=6)
+        self._search_entry.pack(side="left", fill="both", expand=True, padx=(6, 12))
 
-        filters = tk.Frame(self.content, bg=c["bg"])
-        filters.pack(fill="x", padx=28, pady=(14, 10))
+        self._habit_mark_all = HoverButton(
+            toolbar, self, "Complete all", command=self._shortcut_mark_all,
+            icon="check", kind="soft", height=40, font_size=10, bg=c["bg"])
+        self._habit_mark_all.pack(side="right")
+
+        filters = tk.Frame(page, bg=c["bg"])
+        filters.pack(fill="x", padx=PAGE_PAD, pady=(12, 0))
         self._filter_chips = {}
         for category in ["All"] + CAT_LIST:
-            color = c["primary"] if category == "All" else CATEGORIES.get(category)
-            selected = self._filter_cat.get() == category
-            chip = ChoiceChip(filters, self, category, color=color, selected=selected,
-                              bg=c["bg"], height=26, font_size=8)
-            chip.configure(cursor="hand2")
-            chip.bind("<Button-1>", lambda _e, cat=category: self._set_cat_filter(cat), add="+")
+            color = c["primary"] if category == "All" else cat_color(category, c)
+            chip = ChoiceChip(filters, self, category, color=color,
+                              selected=self._filter_cat.get() == category,
+                              bg=c["bg"], height=28, font_size=9)
+            chip.bind("<Button-1>",
+                      lambda _e, cat=category: self._set_cat_filter(cat), add="+")
             chip.pack(side="left", padx=(0, 6))
             self._filter_chips[category] = chip
 
-        self._task_scroll = ScrollableFrame(
-            self.content, c["bg"], padding=0,
-            track=mix(c["border"], c["bg"], 0.4), thumb=c["border_hi"],
-        )
-        self._task_scroll.pack(fill="both", expand=True, padx=28, pady=(0, 16))
+        summary = tk.Frame(page, bg=c["bg"])
+        summary.pack(fill="x", padx=PAGE_PAD, pady=(18, 10))
+        self._habit_counts_label = tk.Label(
+            summary, text=self._habit_header_text(tasks, done), bg=c["bg"],
+            fg=c["text"], font=f(13, "bold"), anchor="w")
+        self._habit_counts_label.pack(side="left")
 
+        bar_holder = tk.Frame(summary, bg=c["bg"], width=200, height=6)
+        bar_holder.pack(side="right", pady=(7, 0))
+        bar_holder.pack_propagate(False)
+        self._habit_segments = SegmentBar(bar_holder, self, total=len(tasks),
+                                          done=done, height=6, bg=c["bg"], gap=4)
+        self._habit_segments.pack(fill="both", expand=True)
+
+        list_card = Card(page, self, radius=CARD_RADIUS, pad=(12, 12))
+        list_card.pack(fill="both", expand=True, padx=PAGE_PAD, pady=(0, 26))
+        self._task_scroll = ScrollableFrame(list_card.body, c["card"], padding=0,
+                                            track=c["card"], thumb=c["border_hi"])
+        self._task_scroll.pack(fill="both", expand=True)
         self._render_habit_list()
+        self._update_habit_header()
 
     def _habit_header_text(self, tasks=None, done=None):
         tasks = self.dm.get_scheduled_today() if tasks is None else tasks
@@ -2309,20 +3411,27 @@ class HabitsViewMixin:
         done = sum(1 for t in tasks if t["id"] in done_ids) if done is None else done
         if not tasks:
             return "No habits scheduled today"
-        return f"{done} of {len(tasks)} habits complete today"
+        return f"{done} of {len(tasks)} habits complete"
 
     def _update_habit_header(self):
+        tasks = self.dm.get_scheduled_today()
+        done_ids = self.dm.get_completed_today()
+        done = sum(1 for t in tasks if t["id"] in done_ids)
         label = getattr(self, "_habit_counts_label", None)
         if label is not None:
             try:
-                label.configure(text=self._habit_header_text())
+                label.configure(text=self._habit_header_text(tasks, done))
+            except tk.TclError:
+                pass
+        segments = getattr(self, "_habit_segments", None)
+        if segments is not None:
+            try:
+                segments.set_values(done, len(tasks), animate=False)
             except tk.TclError:
                 pass
         mark_all = getattr(self, "_habit_mark_all", None)
         if mark_all is not None:
-            tasks = self.dm.get_scheduled_today()
-            done_ids = self.dm.get_completed_today()
-            mark_all.set_enabled(bool(tasks) and sum(1 for t in tasks if t["id"] in done_ids) < len(tasks))
+            mark_all.set_enabled(bool(tasks) and done < len(tasks))
 
     def _set_cat_filter(self, category):
         self._filter_cat.set(category)
@@ -2373,156 +3482,66 @@ class HabitsViewMixin:
             visible = [t for t in visible if t.get("category") == category]
 
         if not tasks:
-            self._empty_state(inner, c["bg"], "Nothing scheduled today",
-                              "Every habit is either unscheduled for today or not created yet. "
-                              "Add a habit to get started.", "New habit", self._open_add_task)
+            holder = tk.Frame(inner, bg=c["card"])
+            holder.pack(fill="x", padx=8, pady=6)
+            self._empty_state(holder, c["card"], "Nothing scheduled today",
+                              "Every habit is either unscheduled for today or not "
+                              "created yet. Add one to get started.",
+                              "New habit", self._open_add_task)
             return
         if not visible:
-            self._empty_state(inner, c["bg"], "No habits match",
-                              "Try a different search term or clear the category filter.",
-                              "Clear filters", self._clear_filters, icon="search")
+            holder = tk.Frame(inner, bg=c["card"])
+            holder.pack(fill="x", padx=8, pady=6)
+            self._empty_state(holder, c["card"], "No habits match",
+                              "Try a different search term or clear the category "
+                              "filter.", "Clear filters", self._clear_filters,
+                              icon="search")
             return
 
         pinned = [t for t in visible if t.get("pinned")]
         others = [t for t in visible if not t.get("pinned")]
 
-        def section(title, items):
+        def section(title, items, show_header=True):
             if not items:
                 return
-            head = tk.Frame(inner, bg=c["bg"])
-            head.pack(fill="x", pady=(10, 4))
-            if title == "Pinned":
-                icon = tk.Canvas(head, width=14, height=14, bg=c["bg"],
-                                 highlightthickness=0, bd=0)
-                icon.pack(side="left", padx=(0, 5))
-                draw_icon(icon, "pin", 7, 7, size=12, color=c["text3"], width=1.6)
-            tk.Label(head, text=title.upper(), bg=c["bg"], fg=c["text3"],
-                     font=(FONT_FAMILY, 8, "bold"), anchor="w").pack(side="left")
-            tk.Label(head, text=f"{len(items)}", bg=c["bg"], fg=c["text3"],
-                     font=f(8), anchor="w").pack(side="left", padx=(6, 0))
+            if show_header:
+                head = tk.Frame(inner, bg=c["card"])
+                head.pack(fill="x", padx=8, pady=(10, 6))
+                if title == "Pinned":
+                    icon = tk.Canvas(head, width=14, height=14, bg=c["card"],
+                                     highlightthickness=0, bd=0)
+                    icon.pack(side="left", padx=(0, 6))
+                    draw_icon(icon, "pin", 7, 7, size=12, color=c["text3"], width=1.6)
+                tk.Label(head, text=title, bg=c["card"], fg=c["text3"],
+                         font=(FONT_FAMILY, 9, "bold"), anchor="w").pack(side="left")
+                tk.Label(head, text=str(len(items)), bg=c["card"], fg=c["text3"],
+                         font=f(9), anchor="w").pack(side="left", padx=(7, 0))
             for task in items:
                 row = HabitRow(
                     inner, self, task, task["id"] in done_ids,
                     stats=self.dm.habit_stats(task, 30),
-                    on_toggle=self._toggle_from_list,
+                    on_toggle=self._toggle_task,
                     on_edit=self._open_edit_task,
                     on_delete=self._delete_task,
                 )
-                row.pack(fill="x", pady=3)
+                row.pack(fill="x", padx=8, pady=(0, 8))
                 self._habit_rows[task["id"]] = row
 
-        section("Pinned", pinned)
-        section("Today", others)
-        tk.Frame(inner, bg=c["bg"], height=18).pack()
+        if pinned:
+            section("PINNED", pinned)
+            section("TODAY", others, show_header=True)
+        else:
+            section("TODAY", others, show_header=False)
+        tk.Frame(inner, bg=c["card"], height=6).pack()
+
 # ==================================================================
-# CHARTS + STATISTICS VIEW
+# STATISTICS
 # ==================================================================
-class TrendChart(tk.Canvas):
-    """Smooth completion trend with a stippled area fill (no dependencies)."""
-
-    def __init__(self, parent, app, values, labels=None, height=180, color=None, bg=None):
-        self.c = app.c
-        self._values = list(values)
-        self._labels = list(labels or [])
-        self._color = color or self.c["primary"]
-        self._bg = bg or parent.cget("bg")
-        self._progress = 0.0
-        super().__init__(parent, height=height, bg=self._bg, highlightthickness=0, bd=0)
-        self.bind("<Configure>", lambda _e: self._draw(self._progress))
-        self.after(80, self._animate)
-
-    def _animate(self):
-        if not self.winfo_exists():
-            return
-        self._progress = min(1.0, self._progress + 0.12)
-        self._draw(1 - (1 - self._progress) ** 2.5 if self._progress < 1 else 1.0)
-        if self._progress < 1:
-            self.after(26, self._animate)
-
-    def _draw(self, progress=1.0):
-        self.delete("all")
-        c = self.c
-        width = self.winfo_width()
-        height = self.winfo_height()
-        if width < 40 or height < 40 or not self._values:
-            return
-        left, right, top, bottom = 34, 14, 16, 24
-        chart_w = width - left - right
-        chart_h = height - top - bottom
-        count = len(self._values)
-
-        for level in (0, 25, 50, 75, 100):
-            y = top + chart_h - (level / 100) * chart_h
-            self.create_line(left, y, width - right, y, fill=c["border"], dash=(2, 5))
-            self.create_text(left - 8, y, text=str(level), anchor="e",
-                             font=(FONT_FAMILY, 7), fill=c["text3"])
-
-        def point(index, value):
-            x = left + (chart_w * index / max(1, count - 1))
-            y = top + chart_h - (max(0.0, min(100.0, value)) / 100) * chart_h * progress
-            return x, y
-
-        points = [point(index, value) for index, value in enumerate(self._values)]
-        if len(points) > 1:
-            area = points + [(points[-1][0], top + chart_h), (points[0][0], top + chart_h)]
-            flat = [coord for pair in area for coord in pair]
-            self.create_polygon(*flat, fill=self._color, stipple="gray25", outline="")
-            line = [coord for pair in points for coord in pair]
-            self.create_line(*line, fill=self._color, width=2, smooth=True,
-                             splinesteps=12, capstyle="round", joinstyle="round")
-        for index, (x, y) in enumerate(points):
-            last = index == len(points) - 1
-            radius = 3.4 if last else 2.2
-            self.create_oval(x - radius, y - radius, x + radius, y + radius,
-                             fill=self._color if last else c["surface"],
-                             outline=self._color, width=1.4)
-            if last and progress > 0.9:
-                self.create_oval(x - 7, y - 7, x + 7, y + 7, outline=self._color,
-                                 width=1, dash=(2, 3))
-                value = self._values[index]
-                self.create_text(min(width - right - 18, x + 4), max(top + 8, y - 13),
-                                 text=f"{int(value)}%", anchor="e",
-                                 font=(FONT_FAMILY, 8, "bold"), fill=c["primary_l"])
-        step = max(1, count // 7)
-        for index in range(0, count, step):
-            x = left + (chart_w * index / max(1, count - 1))
-            label = self._labels[index] if index < len(self._labels) else ""
-            self.create_text(x, height - 8, text=label, font=(FONT_FAMILY, 8), fill=c["text2"])
-
-
-def inline_progress(parent, app, fraction, color=None, height=6, width=150):
-    canvas = tk.Canvas(parent, height=height, width=width, bg=parent.cget("bg"),
-                       highlightthickness=0, bd=0)
-    fraction = max(0.0, min(1.0, fraction))
-
-    def draw(_event=None):
-        canvas.delete("all")
-        total = canvas.winfo_width() or width
-        rrect(canvas, 0, 0, total, height, height / 2, fill=app.c["prog_bg"])
-        if fraction > 0:
-            rrect(canvas, 0, 0, max(height, total * fraction), height, height / 2,
-                  fill=color or app.c["primary"])
-
-    canvas.bind("<Configure>", draw)
-    canvas.after(30, draw)
-    return canvas
-
-
-class StatsViewMixin:
-    """Statistics overview built entirely from stored data."""
-
-    def _section_label(self, parent, text, pady=(18, 8)):
-        tk.Label(parent, text=text.upper(), bg=self.c["bg"], fg=self.c["text3"],
-                 font=(FONT_FAMILY, 8, "bold"), anchor="w").pack(fill="x", padx=28, pady=pady)
+class StatsViewMixin(ViewHelpersMixin):
 
     def _view_stats(self):
         c = self.c
-        scroll = ScrollableFrame(self.content, c["bg"], padding=0,
-                                 track=mix(c["border"], c["bg"], 0.4), thumb=c["border_hi"])
-        scroll.pack(fill="both", expand=True)
-        page = scroll.inner
-        pad = 28
-
+        scroll, page = self._page()
         today = date.today()
         week = self.dm.get_week_pcts()
         month_all = self.dm.get_month_pcts()
@@ -2537,168 +3556,203 @@ class StatsViewMixin:
         xp, level, level_name, xp_in, xp_for = self.dm.get_xp_info()
         consistency = self.dm.consistency(30)
 
-        header = tk.Frame(page, bg=c["bg"])
-        header.pack(fill="x", padx=pad, pady=(22, 0))
-        tk.Label(header, text="Performance overview", bg=c["bg"], fg=c["text"],
-                 font=f(20, "bold"), anchor="w").pack(anchor="w")
-        tk.Label(header, text=f"{today.strftime('%B %Y')}  ·  {elapsed} days tracked this month",
-                 bg=c["bg"], fg=c["text2"], font=f(10), anchor="w").pack(anchor="w", pady=(2, 0))
+        self._page_header(
+            page, "Performance",
+            f"{today.strftime('%B %Y')}  ·  {elapsed} days logged this month  ·  "
+            f"{perfect_total} perfect days all time",
+        )
 
+        strip = tk.Frame(page, bg=c["bg"])
+        strip.pack(fill="x", padx=PAGE_PAD, pady=(SECTION_GAP + 2, 0))
         tiles = [
-            ("chart", f"{week_avg}%", "Weekly average", "Mon to Sun", c["primary_l"]),
-            ("target", f"{month_avg}%", "Monthly average", "elapsed days", c["accent"]),
-            ("trophy", f"{perfect_month}", "Perfect days", "this month", c["success"]),
-            ("flame", f"{streak}", "Current streak", f"best {best}", c["warning"]),
-            ("spark", f"{consistency * 100:.0f}%", "30-day consistency", "average", c["purple_l"]),
-            ("bolt", f"{xp:,}", "Total XP", f"level {level} · {level_name}", c["primary_l"]),
+            StatTile(strip, self, "chart", c["primary_l"], f"{week_avg}%",
+                     "Weekly average", "Mon – Sun", bg=c["bg"]),
+            StatTile(strip, self, "target", c["accent"], f"{month_avg}%",
+                     "Monthly average", "elapsed days", bg=c["bg"]),
+            StatTile(strip, self, "trophy", c["success"], str(perfect_month),
+                     "Perfect days", "this month", bg=c["bg"]),
+            StatTile(strip, self, "flame", c["warning"], str(streak),
+                     "Current streak", f"best {best}", bg=c["bg"]),
+            StatTile(strip, self, "spark", c["purple_l"],
+                     f"{int(round(consistency * 100))}%", "30-day consistency",
+                     "average rate", bg=c["bg"]),
+            StatTile(strip, self, "bolt", c["primary_l"], f"{xp:,}",
+                     "Total XP", f"L{level} {level_name}  ·  {xp_in}/{xp_for}",
+                     bg=c["bg"]),
         ]
-        grid = tk.Frame(page, bg=c["bg"])
-        grid.pack(fill="x", padx=pad, pady=(16, 0))
-        for index, (icon, value, label, hint, color) in enumerate(tiles):
-            tile = Card(grid, self, radius=14, padding=(14, 12))
-            column = index % 3
-            row = index // 3
-            tile.grid(row=row, column=column, sticky="nsew",
-                      padx=(0 if column == 0 else 10, 0), pady=(0 if row == 0 else 10, 0))
-            grid.columnconfigure(column, weight=1, uniform="stat")
-            top = tk.Frame(tile.body, bg=c["card"])
-            top.pack(fill="x")
-            IconTile(top, self, icon, color=color, size=32, bg=c["card"]).pack(side="left")
-            value_box = tk.Frame(top, bg=c["card"])
-            value_box.pack(side="left", padx=10)
-            tk.Label(value_box, text=value, bg=c["card"], fg=c["text"], font=f(17, "bold"),
-                     anchor="w").pack(anchor="w")
-            tk.Label(value_box, text=label, bg=c["card"], fg=c["text2"], font=f(8),
-                     anchor="w").pack(anchor="w")
-            tk.Label(tile.body, text=hint, bg=c["card"], fg=c["text3"], font=f(8),
-                     anchor="w").pack(anchor="w", pady=(7, 0))
+        self._responsive_grid(strip, tiles, min_width=235, gap=12, max_cols=3)
 
+        # -- week + achievements ------------------------------------
         body = tk.Frame(page, bg=c["bg"])
-        body.pack(fill="both", expand=True, padx=pad, pady=(14, 0))
+        body.pack(fill="x", padx=PAGE_PAD, pady=(SECTION_GAP, 0))
         body.columnconfigure(0, weight=3, uniform="stats")
         body.columnconfigure(1, weight=2, uniform="stats")
+        body.rowconfigure(0, weight=1)
 
-        week_card = Card(body, self, radius=16, padding=(18, 16))
-        week_card.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+        week_card = Card(body, self, radius=CARD_RADIUS, pad=(20, 18))
+        week_card.grid(row=0, column=0, sticky="nsew", padx=(0, SECTION_GAP))
         head = tk.Frame(week_card.body, bg=c["card"])
         head.pack(fill="x")
         tk.Label(head, text="Last 7 days", bg=c["card"], fg=c["text"],
-                 font=f(12, "bold"), anchor="w").pack(side="left")
+                 font=f(13, "bold"), anchor="w").pack(side="left")
         tk.Label(head, text=f"{week_avg}% average", bg=c["card"], fg=c["primary_l"],
-                 font=f(9, "bold"), anchor="e").pack(side="right")
+                 font=f(10, "bold"), anchor="e").pack(side="right")
         labels = [day.strftime("%a") for day in self.dm.get_week_dates()]
-        WeekBars(week_card.body, self, height=150, values=week, labels=labels,
-                 highlight=today.weekday(), bg=c["card"]).pack(fill="x", pady=(10, 4))
-        tk.Label(week_card.body, text="Completion rate per day. Today is highlighted.",
-                 bg=c["card"], fg=c["text3"], font=f(8), anchor="w").pack(anchor="w")
+        chart_holder = tk.Frame(week_card.body, bg=c["card"], height=196)
+        chart_holder.pack(fill="both", expand=True, pady=(10, 0))
+        chart_holder.pack_propagate(False)
+        WeekBars(chart_holder, self, height=196, values=week, labels=labels,
+                 highlight=today.weekday(), bg=c["card"]).pack(fill="both", expand=True)
+        tk.Label(week_card.body, text="Completion rate per day · today highlighted",
+                 bg=c["card"], fg=c["text3"], font=f(9), anchor="w").pack(
+            anchor="w", pady=(8, 0))
 
-        achievements_card = Card(body, self, radius=16, padding=(18, 16))
+        achievements_card = Card(body, self, radius=CARD_RADIUS, pad=(20, 18))
         achievements_card.grid(row=0, column=1, sticky="nsew")
         items = self._achievements()
         head = tk.Frame(achievements_card.body, bg=c["card"])
-        head.pack(fill="x", pady=(0, 6))
+        head.pack(fill="x", pady=(0, 8))
         tk.Label(head, text="Achievements", bg=c["card"], fg=c["text"],
-                 font=f(12, "bold"), anchor="w").pack(side="left")
+                 font=f(13, "bold"), anchor="w").pack(side="left")
         tk.Label(head, text=f"{sum(1 for i in items if i['earned'])}/{len(items)}",
-                 bg=c["card"], fg=c["text2"], font=f(9), anchor="e").pack(side="right")
+                 bg=c["card"], fg=c["text2"], font=f(10), anchor="e").pack(side="right")
         for item in items:
-            self._achievement_row(achievements_card.body, item)
+            MilestoneRow(achievements_card.body, self, item).pack(fill="x", pady=3)
+        missing = [i for i in items if not i["earned"]]
+        if missing:
+            hairline(achievements_card.body, self, pady=(10, 8))
+            nxt = missing[0]
+            tk.Label(achievements_card.body,
+                     text=f"Next up  ·  {nxt['name']} — {nxt['desc']}",
+                     bg=c["card"], fg=c["text3"], font=f(9), anchor="w",
+                     justify="left", wraplength=280).pack(anchor="w")
 
-        trend_card = Card(page, self, radius=16, padding=(18, 16))
-        trend_card.pack(fill="x", padx=pad, pady=(14, 0))
+        # -- month trend --------------------------------------------
+        trend_card = Card(page, self, radius=CARD_RADIUS, pad=(20, 18))
+        trend_card.pack(fill="x", padx=PAGE_PAD, pady=(SECTION_GAP, 0))
         head = tk.Frame(trend_card.body, bg=c["card"])
         head.pack(fill="x")
         tk.Label(head, text=f"Month trend  ·  {today.strftime('%B')}", bg=c["card"],
-                 fg=c["text"], font=f(12, "bold"), anchor="w").pack(side="left")
+                 fg=c["text"], font=f(13, "bold"), anchor="w").pack(side="left")
         tk.Label(head, text=f"{month_avg}% average", bg=c["card"], fg=c["accent"],
-                 font=f(9, "bold"), anchor="e").pack(side="right")
+                 font=f(10, "bold"), anchor="e").pack(side="right")
         if any(value > 0 for value in month_elapsed):
             TrendChart(trend_card.body, self, month_elapsed,
                        labels=[str(index + 1) for index in range(len(month_elapsed))],
-                       height=190, bg=c["card"]).pack(fill="x", pady=(10, 0))
+                       height=200, bg=c["card"]).pack(fill="x", pady=(10, 0))
         else:
-            tk.Label(trend_card.body, text="Complete a few habits to see your month take shape.",
-                     bg=c["card"], fg=c["text3"], font=f(9), anchor="w").pack(anchor="w", pady=18)
+            tk.Label(trend_card.body,
+                     text="Complete a few habits to see your month take shape.",
+                     bg=c["card"], fg=c["text3"], font=f(10), anchor="w").pack(
+                anchor="w", pady=24)
 
-        consistency_card = Card(page, self, radius=16, padding=(18, 16))
-        consistency_card.pack(fill="x", padx=pad, pady=(14, 24))
+        # -- per-habit consistency ----------------------------------
+        consistency_card = Card(page, self, radius=CARD_RADIUS, pad=(20, 18))
+        consistency_card.pack(fill="x", padx=PAGE_PAD, pady=(SECTION_GAP, 28))
         head = tk.Frame(consistency_card.body, bg=c["card"])
-        head.pack(fill="x", pady=(0, 8))
+        head.pack(fill="x", pady=(0, 6))
         tk.Label(head, text="Habit consistency", bg=c["card"], fg=c["text"],
-                 font=f(12, "bold"), anchor="w").pack(side="left")
+                 font=f(13, "bold"), anchor="w").pack(side="left")
         tk.Label(head, text="last 30 days", bg=c["card"], fg=c["text3"],
-                 font=f(9), anchor="e").pack(side="right")
+                 font=f(10), anchor="e").pack(side="right")
 
         tasks = sorted(self.dm.data["tasks"],
                        key=lambda t: self.dm.habit_stats(t, 30)["rate"], reverse=True)
         if not tasks:
-            tk.Label(consistency_card.body, text="No habits yet — add one to start tracking.",
-                     bg=c["card"], fg=c["text3"], font=f(9), anchor="w").pack(anchor="w")
+            tk.Label(consistency_card.body,
+                     text="No habits yet — add one to start tracking.",
+                     bg=c["card"], fg=c["text3"], font=f(10), anchor="w").pack(
+                anchor="w", pady=10)
         for task in tasks:
             stats = self.dm.habit_stats(task, 30)
-            color = CATEGORIES.get(task.get("category"), c["primary"])
+            color = cat_color(task.get("category"), c)
             row = tk.Frame(consistency_card.body, bg=c["card"])
-            row.pack(fill="x", pady=4)
-            dot = tk.Canvas(row, width=10, height=10, bg=c["card"], highlightthickness=0, bd=0)
-            dot.pack(side="left", padx=(0, 8))
-            rrect(dot, 0, 0, 10, 10, 3, fill=color)
-            tk.Label(row, text=task["name"], bg=c["card"], fg=c["text"], font=f(9),
-                     anchor="w", width=24).pack(side="left")
-            inline_progress(row, self, stats["rate"], color=color, width=150).pack(
-                side="left", padx=(4, 10))
-            tk.Label(row, text=f"{int(round(stats['rate'] * 100))}%", bg=c["card"],
-                     fg=c["text2"], font=f(9, "bold"), width=4, anchor="e").pack(side="left")
-            tk.Label(row, text=f"{stats['done']}/{stats['scheduled']}", bg=c["card"],
-                     fg=c["text3"], font=f(8), width=7, anchor="e").pack(side="left", padx=(4, 8))
-            if stats["streak"] > 0:
-                chip = tk.Frame(row, bg=mix(c["warning"], c["card"], 0.86), padx=6, pady=1)
-                chip.pack(side="right")
-                tk.Label(chip, text=f"{stats['streak']} day streak",
-                         bg=chip.cget("bg"), fg=c["warning"], font=f(8, "bold")).pack()
+            row.pack(fill="x", pady=5)
+            row.columnconfigure(1, weight=1)
 
-    # -- calendar -----------------------------------------------------
+            dot = tk.Canvas(row, width=10, height=10, bg=c["card"],
+                            highlightthickness=0, bd=0)
+            dot.grid(row=0, column=0, padx=(0, 9))
+            rrect(dot, 0, 0, 10, 10, 3, fill=color)
+
+            name = tk.Label(row, text=task["name"], bg=c["card"], fg=c["text"],
+                            font=f(10), anchor="w")
+            name.grid(row=0, column=1, sticky="ew")
+
+            ratio = tk.Label(row, text=f"{int(round(stats['rate'] * 100))}%",
+                             bg=c["card"], fg=c["text2"], font=f(10, "bold"),
+                             width=5, anchor="e")
+            ratio.grid(row=0, column=3, padx=(10, 0))
+
+            bar = tk.Canvas(row, height=6, bg=c["card"], highlightthickness=0, bd=0)
+            bar.grid(row=0, column=2, sticky="ew", padx=(16, 0))
+            row.columnconfigure(2, weight=1)
+
+            def draw(_event=None, canvas=bar, fraction=stats["rate"], fill=color):
+                canvas.delete("all")
+                width = canvas.winfo_width()
+                if width < 4:
+                    return
+                rrect(canvas, 0, 0, width, 6, 3, fill=c["track"])
+                if fraction > 0:
+                    rrect(canvas, 0, 0, max(6, width * fraction), 6, 3, fill=fill)
+
+            bar.bind("<Configure>", draw)
+            tk.Label(row, text=f"{stats['done']}/{stats['scheduled']} due",
+                     bg=c["card"], fg=c["text3"], font=f(9), anchor="e").grid(
+                row=0, column=4, padx=(12, 0))
+
+
+# ==================================================================
+# CALENDAR
+# ==================================================================
+class CalendarViewMixin(ViewHelpersMixin):
+
     def _view_calendar(self):
         c = self.c
-        frame = tk.Frame(self.content, bg=c["bg"])
-        frame.pack(fill="both", expand=True, padx=28, pady=(20, 16))
+        scroll, page = self._page()
+        self._page_header(page, "Calendar",
+                          "Every day you showed up, at a glance")
 
-        nav = tk.Frame(frame, bg=c["bg"])
-        nav.pack(fill="x", pady=(0, 12))
-        left = tk.Frame(nav, bg=c["bg"])
-        left.pack(side="left")
-        tk.Label(left, text="History", bg=c["bg"], fg=c["text"], font=f(15, "bold"),
-                 anchor="w").pack(anchor="w")
-        self.lbl_cal_month = tk.Label(left, text="", bg=c["bg"], fg=c["text2"],
-                                      font=f(9), anchor="w")
-        self.lbl_cal_month.pack(anchor="w")
+        card = Card(page, self, radius=CARD_RADIUS, pad=(22, 18))
+        card.pack(fill="both", expand=True, padx=PAGE_PAD, pady=(SECTION_GAP + 4, 28))
 
-        controls = tk.Frame(nav, bg=c["bg"])
+        head = tk.Frame(card.body, bg=c["card"])
+        head.pack(fill="x")
+        self.lbl_cal_month = tk.Label(head, text="", bg=c["card"], fg=c["text"],
+                                      font=f(15, "bold"), anchor="w")
+        self.lbl_cal_month.pack(side="left")
+
+        controls = tk.Frame(head, bg=c["card"])
         controls.pack(side="right")
-        HoverButton(controls, self, "Today", command=self._cal_today, kind="soft",
-                    height=32, font_size=9, bg=c["bg"]).pack(side="right", padx=(8, 0))
-        next_btn = IconButton(controls, self, "chevron-right", command=self._cal_next,
-                              size=32, icon_size=16, bg=c["bg"], color=c["text2"])
-        next_btn.pack(side="right", padx=(4, 0))
-        prev_btn = IconButton(controls, self, "chevron-left", command=self._cal_prev,
-                              size=32, icon_size=16, bg=c["bg"], color=c["text2"])
-        prev_btn.pack(side="right")
+        HoverButton(controls, self, "Today", command=self._cal_today, kind="ghost",
+                    height=32, font_size=9, bg=c["card"]).pack(side="left",
+                                                               padx=(0, 6))
+        for icon, command in (("chevron-left", self._cal_prev),
+                              ("chevron-right", self._cal_next)):
+            IconButton(controls, self, icon, command=command, size=32, icon_size=15,
+                       bg=c["card"]).pack(side="left", padx=(2, 0))
 
-        legend = tk.Frame(frame, bg=c["bg"])
-        legend.pack(fill="x", pady=(0, 10))
-        for label, color in (("Perfect", c["success"]), ("Partial", c["warning"]),
-                             ("Missed", c["danger"]), ("Future", c["text3"])):
-            dot = tk.Canvas(legend, width=10, height=10, bg=c["bg"],
-                            highlightthickness=0, bd=0)
-            dot.pack(side="left", padx=(0, 5))
-            rrect(dot, 0, 0, 10, 10, 3, fill=color)
-            tk.Label(legend, text=label, bg=c["bg"], fg=c["text2"], font=f(8)).pack(
-                side="left", padx=(0, 14))
+        self.lbl_cal_summary = tk.Label(card.body, text="", bg=c["card"],
+                                        fg=c["text3"], font=f(10), anchor="w")
+        self.lbl_cal_summary.pack(fill="x", pady=(6, 14))
 
-        self.cal_grid_frame = tk.Frame(frame, bg=c["bg"])
+        self.cal_grid_frame = tk.Frame(card.body, bg=c["card"])
         self.cal_grid_frame.pack(fill="both", expand=True)
-        self.lbl_cal_summary = tk.Label(frame, text="", bg=c["bg"], fg=c["text3"],
-                                        font=f(9), anchor="w")
-        self.lbl_cal_summary.pack(fill="x", pady=(10, 0))
+
+        legend = tk.Frame(card.body, bg=c["card"])
+        legend.pack(fill="x", pady=(16, 0))
+        for label, color in (("Perfect", c["success"]), ("Partial", c["warning"]),
+                             ("Missed", c["danger"]), ("No habits", c["text3"]),
+                             ("Upcoming", c["border_hi"])):
+            item = tk.Frame(legend, bg=c["card"])
+            item.pack(side="left", padx=(0, 18))
+            dot = tk.Canvas(item, width=8, height=8, bg=c["card"],
+                            highlightthickness=0, bd=0)
+            dot.pack(side="left", padx=(0, 6))
+            rrect(dot, 0, 0, 8, 8, 2.5, fill=color)
+            tk.Label(item, text=label, bg=c["card"], fg=c["text3"],
+                     font=f(9)).pack(side="left")
 
         self._cal_year = tk.IntVar(value=date.today().year)
         self._cal_month = tk.IntVar(value=date.today().month)
@@ -2724,9 +3778,9 @@ class StatsViewMixin:
         first_weekday = cal_module.monthrange(year, month)[0]
 
         for index, name in enumerate(WEEKDAY_NAMES):
-            tk.Label(self.cal_grid_frame, text=name.upper(), bg=c["bg"], fg=c["text3"],
-                     font=(FONT_FAMILY, 7, "bold")).grid(row=0, column=index, sticky="w",
-                                                         padx=6, pady=(0, 6))
+            tk.Label(self.cal_grid_frame, text=name.upper(), bg=c["card"],
+                     fg=c["text3"], font=(FONT_FAMILY, 8, "bold")).grid(
+                row=0, column=index, sticky="w", padx=6, pady=(0, 8))
             self.cal_grid_frame.columnconfigure(index, weight=1, uniform="cal")
 
         row, column = 1, first_weekday
@@ -2750,7 +3804,7 @@ class StatsViewMixin:
                 state = "missed"
                 missed += 1
             cell = CalendarCell(self.cal_grid_frame, self, day_number, state, pct,
-                                day == today, c["bg"])
+                                day == today, c["card"])
             cell.grid(row=row, column=column, sticky="nsew", padx=3, pady=3)
             column += 1
             if column == 7:
@@ -2768,8 +3822,7 @@ class StatsViewMixin:
     def _cal_month_summary(year, month, perfect, partial, missed):
         if date(year, month, 1) > date.today():
             return "This month has not started yet."
-        return (f"{perfect} perfect  ·  {partial} partial  ·  {missed} missed  ·  "
-                f"{date(year, month, 1).strftime('%B')} {year}")
+        return f"{perfect} perfect  ·  {partial} partial  ·  {missed} missed"
 
     def _shift_month(self, delta):
         month = self._cal_month.get() + delta
@@ -2799,13 +3852,13 @@ class StatsViewMixin:
 class CalendarCell(tk.Canvas):
     """One day cell of the history calendar."""
 
-    HEIGHT = 66
+    HEIGHT = 68
     STATES = {
         "perfect": ("success", 0.80),
         "partial": ("warning", 0.84),
-        "missed": ("danger", 0.86),
-        "none": ("surface", 0.55),
-        "future": ("surface", 0.35),
+        "missed": ("danger", 0.93),
+        "none": ("surface3", 0.55),
+        "future": ("surface", 0.80),
     }
 
     def __init__(self, parent, app, day, state, pct, is_today, bg):
@@ -2816,7 +3869,7 @@ class CalendarCell(tk.Canvas):
         self._pct = pct
         self._today = is_today
         super().__init__(parent, height=self.HEIGHT, bg=bg, highlightthickness=0, bd=0)
-        self.bind("<Configure>", lambda _e: self._draw())
+        self.bind("<Configure>", lambda _e=None: self._draw())
 
     def _draw(self):
         self.delete("all")
@@ -2825,101 +3878,100 @@ class CalendarCell(tk.Canvas):
         height = self.HEIGHT
         if width < 8:
             return
-        color_key, mix_ratio = self.STATES.get(self._state, ("surface", 0.4))
-        fill = mix(c[color_key], c["bg"], mix_ratio)
-        outline = c["primary"] if self._today else mix(fill, c["border"], 0.55)
+        color_key, ratio = self.STATES.get(self._state, ("surface3", 0.5))
+        fill = mix(c[color_key], c["card"], ratio)
+        outline = c["primary"] if self._today else mix(fill, c["border"], 0.6)
         rrect(self, 1, 1, width - 1, height - 1, 10, fill=fill)
         rrect(self, 1, 1, width - 1, height - 1, 10, outline=outline,
-              width=1.4 if self._today else 1)
+              width=1.5 if self._today else 1)
 
-        text_color = c["primary_l"] if self._today else (
-            c[color_key] if self._state in ("perfect", "partial", "missed") else c["text3"])
+        text_color = (c["primary_l"] if self._today else
+                      c[color_key] if self._state in ("perfect", "partial")
+                      else c["text3"])
         self.create_text(10, 10, text=str(self._day), anchor="nw",
                          font=(FONT_FAMILY, 9, "bold" if self._today else "normal"),
                          fill=text_color)
 
         if self._state == "perfect":
-            draw_icon(self, "check", width - 16, height - 16, size=14,
+            draw_icon(self, "check", width - 17, height - 16, size=14,
                       color=c["success"], width=2.2)
         elif self._state == "partial":
             self.create_text(width - 9, height - 9, text=f"{int(round(self._pct * 100))}%",
-                             anchor="se", font=(FONT_FAMILY, 8, "bold"), fill=c["warning"])
+                             anchor="se", font=(FONT_FAMILY, 8, "bold"),
+                             fill=c["warning"])
         elif self._state == "missed":
-            draw_icon(self, "close", width - 16, height - 16, size=12,
-                      color=c["danger"], width=1.8)
+            self.create_oval(width - 16, height - 16, width - 10, height - 10,
+                             fill=mix(c["danger"], fill, 0.25), outline="")
         elif self._today:
             self.create_text(width - 9, height - 9, text="today", anchor="se",
-                             font=(FONT_FAMILY, 7, "bold"), fill=c["primary_l"])
+                             font=(FONT_FAMILY, 8, "bold"), fill=c["primary_l"])
+
+
 # ==================================================================
-# VIEW - SETTINGS
+# SETTINGS
 # ==================================================================
-class SettingsViewMixin:
-    """Appearance, data management and about information."""
+class SettingsViewMixin(ViewHelpersMixin):
 
     def _view_settings(self):
         c = self.c
-        scroll = ScrollableFrame(self.content, c["bg"], padding=0,
-                                 track=mix(c["border"], c["bg"], 0.4), thumb=c["border_hi"])
-        scroll.pack(fill="both", expand=True)
-        page = scroll.inner
-        pad = 28
+        scroll, page = self._page()
+        self._page_header(page, "Settings",
+                          "Everything stays on this device — no account, no sync")
 
-        tk.Label(page, text="Preferences", bg=c["bg"], fg=c["text"], font=f(20, "bold"),
-                 anchor="w").pack(fill="x", padx=pad, pady=(22, 0))
-        tk.Label(page, text="Everything stays on this device — no account, no sync, no tracking.",
-                 bg=c["bg"], fg=c["text2"], font=f(9), anchor="w").pack(
-            fill="x", padx=pad, pady=(2, 0))
-
-        # Appearance
         self._settings_section(page, "Appearance")
-        appearance = Card(page, self, radius=16, padding=(18, 16))
-        appearance.pack(fill="x", padx=pad)
+        appearance = Card(page, self, radius=CARD_RADIUS, pad=(20, 18))
+        appearance.pack(fill="x", padx=PAGE_PAD)
         row = tk.Frame(appearance.body, bg=c["card"])
         row.pack(fill="x")
         IconTile(row, self, "sun" if self._theme_name == "dark" else "moon",
                  color=c["primary_l"], size=36, bg=c["card"]).pack(side="left")
         text_box = tk.Frame(row, bg=c["card"])
-        text_box.pack(side="left", padx=12)
+        text_box.pack(side="left", padx=14)
         tk.Label(text_box, text="Color theme", bg=c["card"], fg=c["text"],
-                 font=f(10, "bold"), anchor="w").pack(anchor="w")
-        tk.Label(text_box, text="Dark command center or a lighter workspace",
-                 bg=c["card"], fg=c["text3"], font=f(9), anchor="w").pack(anchor="w")
+                 font=f(11, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(text_box, text="Dark command center, or a lighter workspace",
+                 bg=c["card"], fg=c["text3"], font=f(10), anchor="w").pack(anchor="w")
         Segmented(row, self, ["Dark", "Light"],
                   "Dark" if self._theme_name == "dark" else "Light",
                   command=lambda label: self._apply_theme(label.lower()),
-                  bg=c["card"]).pack(side="right")
+                  bg=c["card"], option_width=86, height=32).pack(side="right")
 
-        # Data
         self._settings_section(page, "Your data")
-        data_card = Card(page, self, radius=16, padding=(18, 16))
-        data_card.pack(fill="x", padx=pad)
+        data_card = Card(page, self, radius=CARD_RADIUS, pad=(20, 18))
+        data_card.pack(fill="x", padx=PAGE_PAD)
         info = tk.Frame(data_card.body, bg=c["card"])
         info.pack(fill="x")
-        IconTile(info, self, "archive", color=c["accent"], size=36, bg=c["card"]).pack(side="left")
+        IconTile(info, self, "archive", color=c["accent"], size=36,
+                 bg=c["card"]).pack(side="left")
         info_text = tk.Frame(info, bg=c["card"])
-        info_text.pack(side="left", padx=12)
+        info_text.pack(side="left", padx=14)
         tk.Label(info_text, text="Local data file", bg=c["card"], fg=c["text"],
-                 font=f(10, "bold"), anchor="w").pack(anchor="w")
-        tk.Label(info_text, text=DATA_FILE, bg=c["card"], fg=c["text3"], font=mono(8),
-                 anchor="w").pack(anchor="w")
+                 font=f(11, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(info_text, text=DATA_FILE, bg=c["card"], fg=c["text3"],
+                 font=mono(9), anchor="w").pack(anchor="w")
         buttons = tk.Frame(data_card.body, bg=c["card"])
-        buttons.pack(fill="x", pady=(14, 0))
-        HoverButton(buttons, self, "Export JSON", command=self._export, icon="download",
-                    kind="soft", height=36, font_size=9, bg=c["card"]).pack(side="left")
-        HoverButton(buttons, self, "Import JSON", command=self._import, icon="upload",
-                    kind="soft", height=36, font_size=9, bg=c["card"]).pack(side="left", padx=8)
-        HoverButton(buttons, self, "Create backup", command=self._backup, icon="archive",
-                    kind="success", height=36, font_size=9, bg=c["card"]).pack(side="left")
-        HoverButton(buttons, self, "Reset all data", command=self._reset_data, icon="reset",
-                    kind="danger", height=36, font_size=9, bg=c["card"]).pack(side="right")
+        buttons.pack(fill="x", pady=(16, 0))
+        HoverButton(buttons, self, "Export JSON", command=self._export,
+                    icon="download", kind="soft", height=36, font_size=10,
+                    bg=c["card"]).pack(side="left")
+        HoverButton(buttons, self, "Import JSON", command=self._import,
+                    icon="upload", kind="soft", height=36, font_size=10,
+                    bg=c["card"]).pack(side="left", padx=8)
+        HoverButton(buttons, self, "Create backup", command=self._backup,
+                    icon="archive", kind="success", height=36, font_size=10,
+                    bg=c["card"]).pack(side="left")
+        HoverButton(buttons, self, "Reset all data", command=self._reset_data,
+                    icon="reset", kind="danger", height=36, font_size=10,
+                    bg=c["card"]).pack(side="right")
         tk.Label(data_card.body,
-                 text="Import replaces the current data file and keeps an automatic backup first.",
-                 bg=c["card"], fg=c["text3"], font=f(8), anchor="w").pack(anchor="w", pady=(10, 0))
+                 text="Import replaces the current data file and keeps an automatic "
+                      "backup first.",
+                 bg=c["card"], fg=c["text3"], font=f(9), anchor="w").pack(
+            anchor="w", pady=(12, 0))
 
-        # Shortcuts
         self._settings_section(page, "Keyboard shortcuts")
-        shortcuts_card = Card(page, self, radius=16, padding=(18, 14))
-        shortcuts_card.pack(fill="x", padx=pad)
+        shortcuts_card = Card(page, self, radius=CARD_RADIUS, pad=(20, 16))
+        shortcuts_card.pack(fill="x", padx=PAGE_PAD)
         shortcuts = [
             ("Ctrl+N", "Create a new habit"),
             ("Ctrl+D", "Complete every habit scheduled today"),
@@ -2932,44 +3984,46 @@ class SettingsViewMixin:
             row = tk.Frame(shortcuts_card.body, bg=c["card"])
             row.pack(fill="x", pady=3)
             self._key_chip(row, keys).pack(side="left")
-            tk.Label(row, text=description, bg=c["card"], fg=c["text2"], font=f(9),
-                     anchor="w").pack(side="left", padx=12)
+            tk.Label(row, text=description, bg=c["card"], fg=c["text2"],
+                     font=f(10), anchor="w").pack(side="left", padx=14)
 
-        # About
-        self._settings_section(page, "About")
-        about = Card(page, self, radius=16, padding=(18, 16), glow=True)
-        about.pack(fill="x", padx=pad, pady=(0, 24))
+        self._settings_section(page, "About", pady=(24, 10))
+        about = Card(page, self, radius=CARD_RADIUS, pad=(20, 18))
+        about.pack(fill="x", padx=PAGE_PAD, pady=(0, 28))
         head = tk.Frame(about.body, bg=c["card"])
         head.pack(fill="x")
-        logo = tk.Canvas(head, width=38, height=38, bg=c["card"], highlightthickness=0, bd=0)
+        logo = tk.Canvas(head, width=38, height=38, bg=c["card"],
+                         highlightthickness=0, bd=0)
         logo.pack(side="left")
         rrect(logo, 0, 0, 38, 38, 12, fill=c["primary_d"])
+        rrect(logo, 0, 0, 38, 38, 12, outline=c["primary"], width=1)
         draw_icon(logo, "layers", 19, 19, size=19, color="#FFFFFF", width=1.7)
         title_box = tk.Frame(head, bg=c["card"])
-        title_box.pack(side="left", padx=12)
+        title_box.pack(side="left", padx=14)
         tk.Label(title_box, text=f"{APP_NAME} {VERSION}", bg=c["card"], fg=c["text"],
-                 font=f(11, "bold"), anchor="w").pack(anchor="w")
-        tk.Label(title_box, text="Offline habit tracking · built on tkinter",
-                 bg=c["card"], fg=c["text3"], font=f(9), anchor="w").pack(anchor="w")
+                 font=f(12, "bold"), anchor="w").pack(anchor="w")
+        tk.Label(title_box, text="Offline habit tracking, built on tkinter",
+                 bg=c["card"], fg=c["text3"], font=f(10), anchor="w").pack(anchor="w")
         tk.Label(about.body,
-                 text="Your habits, streaks and XP are stored in a single JSON file on this "
+                 text="Your habits, streaks and XP live in one JSON file on this "
                       "computer. Nothing leaves the device.",
-                 bg=c["card"], fg=c["text2"], font=f(9), anchor="w", justify="left",
-                 wraplength=760).pack(anchor="w", pady=(12, 0))
+                 bg=c["card"], fg=c["text2"], font=f(10), anchor="w",
+                 justify="left", wraplength=760).pack(anchor="w", pady=(14, 0))
 
-    def _settings_section(self, parent, title):
+    def _settings_section(self, parent, title, pady=(24, 10)):
         tk.Label(parent, text=title.upper(), bg=self.c["bg"], fg=self.c["text3"],
                  font=(FONT_FAMILY, 8, "bold"), anchor="w").pack(
-            fill="x", padx=28, pady=(20, 8))
+            fill="x", padx=PAGE_PAD, pady=pady)
 
     def _key_chip(self, parent, text):
         c = self.c
-        width = tkfont.Font(font=mono(8, "bold")).measure(text) + 18
+        width = tkfont.Font(font=mono(9, "bold")).measure(text) + 20
         canvas = tk.Canvas(parent, width=width, height=24, bg=c["card"],
                            highlightthickness=0, bd=0)
         rrect(canvas, 0.5, 0.5, width - 0.5, 23.5, 6, fill=c["surface2"])
         rrect(canvas, 0.5, 0.5, width - 0.5, 23.5, 6, outline=c["border"], width=1)
-        canvas.create_text(width / 2, 12.5, text=text, font=mono(8, "bold"), fill=c["text2"])
+        canvas.create_text(width / 2, 12.5, text=text, font=mono(9, "bold"),
+                           fill=c["text2"])
         return canvas
 
     # -- data actions -------------------------------------------------
@@ -3014,8 +4068,8 @@ class SettingsViewMixin:
     def _reset_data(self):
         if not messagebox.askyesno(
             "Reset all data",
-            "This permanently deletes every habit, completion record, streak and XP point.\n\n"
-            "A backup is created first. Continue?",
+            "This permanently deletes every habit, completion record, streak and "
+            "XP point.\n\nA backup is created first. Continue?",
             icon="warning", parent=self.root,
         ):
             return
@@ -3024,112 +4078,84 @@ class SettingsViewMixin:
         self.toast("Data reset · fresh start", "info")
 
     def _reload_after_data_change(self, view="Dashboard"):
-        """Rebuild the whole shell so every counter reflects the new data."""
         self._active_view = view
         self._apply_theme(self._theme_name)
+
 # ==================================================================
-# SHARED UI HELPERS
+# SHARED WIDGETS
 # ==================================================================
-def bind_tree(widget, sequence, callback, skip=("Canvas",)):
-    """Bind an event on a widget and all of its descendants."""
-    widget.bind(sequence, callback)
-    for child in widget.winfo_children():
-        if child.winfo_class() in skip:
-            continue
-        bind_tree(child, sequence, callback, skip)
-
-
-def muted_label(parent, text, bg, color=None, size=9, weight="normal"):
-    return tk.Label(parent, text=text, bg=bg, fg=color, font=f(size, weight), anchor="w")
-
-
 class IconTile(tk.Canvas):
-    """Small rounded icon chip used in cards and lists."""
+    """Rounded icon chip used in cards and lists."""
 
-    def __init__(self, parent, app, icon, color=None, size=36, bg=None, soft=True, icon_size=18):
+    def __init__(self, parent, app, icon, color=None, size=36, bg=None, soft=True,
+                 icon_size=18):
         self.c = app.c
         color = color or self.c["primary"]
-        super().__init__(parent, width=size, height=size, bg=bg or parent.cget("bg"),
+        host = bg or parent.cget("bg")
+        super().__init__(parent, width=size, height=size, bg=host,
                          highlightthickness=0, bd=0)
         rrect(self, 0, 0, size, size, size * 0.3,
-              fill=mix(color, self.c["card"], 0.82) if soft else color)
+              fill=mix(color, host, 0.82) if soft else color)
         draw_icon(self, icon, size / 2, size / 2, size=icon_size,
                   color=color if soft else readable_on(color), width=1.8)
 
 
-class NavButton(tk.Canvas):
-    """Sidebar navigation item with an active-state accent bar."""
+class Segmented(tk.Canvas):
+    """Two-or-more option segmented control."""
 
-    def __init__(self, parent, app, icon, label, command, width=212, height=42):
+    def __init__(self, parent, app, options, value, command=None, height=34,
+                 option_width=92, bg=None):
         self.app = app
         self.c = app.c
-        self._icon = icon
-        self._label = label
+        self._segments = list(options)
+        self._value = value
         self._command = command
-        self._active = False
-        self._hover = False
-        super().__init__(parent, width=width, height=height, bg=self.c["sidebar"],
+        self._height = height
+        self._bg = bg or parent.cget("bg")
+        width = option_width * len(options) + 8
+        super().__init__(parent, width=width, height=height, bg=self._bg,
                          highlightthickness=0, bd=0, cursor="hand2")
         self._width = width
-        self._height = height
-        self.bind("<Button-1>", lambda _e: self._command(label))
-        self.bind("<Enter>", self._on_enter)
-        self.bind("<Leave>", self._on_leave)
+        self.bind("<Button-1>", self._on_click)
         self._draw()
 
     def _draw(self):
         self.delete("all")
         c = self.c
-        if self._active:
-            rrect(self, 4, 1, self._width - 6, self._height - 1, 10, fill=c["side_active"])
-            rrect(self, 4, self._height * 0.28, 6.5, self._height * 0.72, 1.25,
-                  fill=c["primary"])
-        elif self._hover:
-            rrect(self, 4, 1, self._width - 6, self._height - 1, 10,
-                  fill=mix(c["sidebar"], c["side_active"], 0.55))
-        icon_color = c["primary_l"] if self._active else (c["side_text"] if self._hover else c["side_text2"])
-        text_color = c["side_text"] if self._active or self._hover else c["side_text2"]
-        draw_icon(self, self._icon, 24, self._height / 2, size=18, color=icon_color, width=1.8)
-        self.create_text(44, self._height / 2 + 0.5, text=self._label, anchor="w",
-                         font=(FONT_FAMILY, 10, "bold" if self._active else "normal"),
-                         fill=text_color)
+        radius = self._height / 2
+        rrect(self, 0, 0, self._width, self._height, radius, fill=c["surface2"])
+        rrect(self, 0.5, 0.5, self._width - 0.5, self._height - 0.5, radius,
+              outline=c["border"], width=1)
+        index = self._segments.index(self._value) if self._value in self._segments else 0
+        pad = 4
+        slot = self._width / len(self._segments)
+        pill_w = slot - pad
+        rrect(self, pad + index * slot, pad, pad + index * slot + pill_w,
+              self._height - pad, (self._height - pad * 2) / 2, fill=c["primary"])
+        for position, option in enumerate(self._segments):
+            centre = slot * position + slot / 2
+            active = position == index
+            self.create_text(centre, self._height / 2 + 0.5, text=option,
+                             font=(FONT_FAMILY, 9, "bold" if active else "normal"),
+                             fill="#FFFFFF" if active else c["text2"])
 
-    def set_active(self, active: bool):
-        self._active = bool(active)
-        self._draw()
-
-    def _on_enter(self, _event):
-        self._hover = True
-        self._draw()
-
-    def _on_leave(self, _event):
-        self._hover = False
-        self._draw()
-
-
-def xp_bar(parent, app, fraction, height=6, color=None, track=None):
-    canvas = tk.Canvas(parent, height=height, bg=parent.cget("bg"),
-                       highlightthickness=0, bd=0)
-    fraction = max(0.0, min(1.0, fraction))
-
-    def draw(_event=None):
-        canvas.delete("all")
-        width = canvas.winfo_width() or 160
-        rrect(canvas, 0, 0, width, height, height / 2, fill=track or app.c["prog_bg"])
-        if fraction > 0:
-            filled = max(height, width * fraction)
-            rrect(canvas, 0, 0, filled, height, height / 2, fill=color or app.c["primary"])
-
-    canvas.bind("<Configure>", draw)
-    canvas.after(30, draw)
-    return canvas
+    def _on_click(self, event):
+        slot = self._width / len(self._segments)
+        index = min(len(self._segments) - 1, max(0, int(event.x // slot)))
+        value = self._segments[index]
+        if value != self._value:
+            self._value = value
+            self._draw()
+            if self._command:
+                self._command(value)
 
 
 # ==================================================================
 # MAIN WINDOW
 # ==================================================================
-class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
-    """HabitFlow 2.0 - a command center for daily discipline."""
+class HabitFlowApp(DashboardViewMixin, HabitsViewMixin, StatsViewMixin,
+                   CalendarViewMixin, SettingsViewMixin):
+    """HabitFlow 2.1 - a command center for daily discipline."""
 
     NAV_ITEMS = [
         ("grid", "Dashboard"),
@@ -3141,10 +4167,10 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
 
     VIEW_SUBTITLES = {
         "Dashboard": "Your day at a glance",
-        "Habits": "Create, edit and complete your routines",
+        "Habits": "Create, edit and complete",
         "Statistics": "Consistency, trends and streaks",
-        "Calendar": "Your perfect-day history",
-        "Settings": "Preferences, data and shortcuts",
+        "Calendar": "Perfect-day history",
+        "Settings": "Preferences and data",
     }
 
     def __init__(self, root: tk.Tk):
@@ -3167,6 +4193,7 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
         self._filter_cat = tk.StringVar(value="All")
         self._search_entry = None
         self._task_scroll = None
+        self._habit_rows = {}
         self._dashboard_rows = {}
         self._dashboard = {}
 
@@ -3182,15 +4209,16 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
     def _setup_window(self):
         self.root.title(f"{APP_NAME}  ·  {VERSION}")
         self.root.configure(bg=self.c["bg"])
-        self.root.geometry("1280x820")
-        self.root.minsize(1040, 700)
-        self.root.bind("<Control-n>", lambda _e: self._open_add_task())
+        self.root.geometry("1360x860")
+        self.root.minsize(1024, 700)
+        self.root.bind("<Control-n>", lambda _e=None: self._open_add_task())
         self.root.bind("<Control-d>", self._shortcut_mark_all)
-        self.root.bind("<F5>", lambda _e: self._refresh())
-        self.root.bind("<Control-f>", lambda _e: self._focus_search())
-        self.root.bind("<Control-q>", lambda _e: self.on_close())
+        self.root.bind("<F5>", lambda _e=None: self._refresh())
+        self.root.bind("<Control-f>", lambda _e=None: self._focus_search())
+        self.root.bind("<Control-q>", lambda _e=None: self.on_close())
         for index, (_icon, name) in enumerate(self.NAV_ITEMS):
-            self.root.bind(f"<Control-Key-{index + 1}>", lambda _e, n=name: self._show(n))
+            self.root.bind(f"<Control-Key-{index + 1}>",
+                           lambda _e, n=name: self._show(n))
 
     def toast(self, message, kind="success"):
         show_toast(self.root, message, self.c, kind=kind)
@@ -3206,65 +4234,70 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
 
     def _build_sidebar(self):
         c = self.c
-        self.sidebar = tk.Frame(self.root, bg=c["sidebar"], width=236)
+        self.sidebar = tk.Frame(self.root, bg=c["sidebar"], width=240)
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
+        tk.Frame(self.sidebar, bg=c["border"], width=1).pack(side="right", fill="y")
 
         brand = tk.Frame(self.sidebar, bg=c["sidebar"])
-        brand.pack(fill="x", padx=18, pady=(22, 18))
-        logo = tk.Canvas(brand, width=38, height=38, bg=c["sidebar"],
+        brand.pack(fill="x", padx=20, pady=(24, 22))
+        logo = tk.Canvas(brand, width=40, height=40, bg=c["sidebar"],
                          highlightthickness=0, bd=0)
         logo.pack(side="left")
-        rrect(logo, 0, 0, 38, 38, 12, fill=c["primary_d"])
-        rrect(logo, 0, 0, 38, 38, 12, outline=c["primary"], width=1)
-        draw_icon(logo, "layers", 19, 19, size=19, color="#FFFFFF", width=1.7)
+        rrect(logo, 0, 0, 40, 40, 12, fill=c["primary_d"])
+        rrect(logo, 0, 0, 40, 40, 12, outline=c["primary"], width=1)
+        draw_icon(logo, "layers", 20, 20, size=20, color="#FFFFFF", width=1.8)
 
         brand_text = tk.Frame(brand, bg=c["sidebar"])
-        brand_text.pack(side="left", padx=10)
+        brand_text.pack(side="left", padx=11)
         tk.Label(brand_text, text=APP_NAME, bg=c["sidebar"], fg=c["side_text"],
-                 font=f(14, "bold"), anchor="w").pack(anchor="w")
+                 font=f(15, "bold"), anchor="w").pack(anchor="w")
         tk.Label(brand_text, text="COMMAND CENTER", bg=c["sidebar"], fg=c["text3"],
-                 font=(FONT_FAMILY, 7, "bold"), anchor="w").pack(anchor="w")
+                 font=(FONT_FAMILY, 8, "bold"), anchor="w").pack(anchor="w")
 
         tk.Label(self.sidebar, text="WORKSPACE", bg=c["sidebar"], fg=c["text3"],
-                 font=(FONT_FAMILY, 7, "bold"), anchor="w").pack(fill="x", padx=24, pady=(6, 6))
+                 font=(FONT_FAMILY, 8, "bold"), anchor="w").pack(
+            fill="x", padx=22, pady=(8, 8))
 
         for icon, label in self.NAV_ITEMS:
-            button = NavButton(self.sidebar, self, icon, label, self._show)
-            button.pack(fill="x", padx=8, pady=1)
+            button = NavButton(self.sidebar, self, icon, label, self._show,
+                               width=222, height=44)
+            button.pack(padx=8, pady=2)
             self._nav_buttons[label] = button
 
         footer = tk.Frame(self.sidebar, bg=c["sidebar"])
-        footer.pack(side="bottom", fill="x", padx=14, pady=14)
+        footer.pack(side="bottom", fill="x", padx=14, pady=16)
+
+        level_card = Card(footer, self, radius=14, pad=(14, 12),
+                          fill=c["sidebar2"],
+                          border=mix(c["sidebar2"], "#FFFFFF", 0.07))
+        level_card.pack(fill="x")
 
         xp, level, level_name, xp_in, xp_for = self.dm.get_xp_info()
-        level_card = tk.Frame(footer, bg=c["sidebar"])
-        level_card.pack(fill="x")
-        level_box = tk.Frame(level_card, bg=c["sidebar2"], padx=12, pady=10)
-        level_box.pack(fill="x")
-        top = tk.Frame(level_box, bg=c["sidebar2"])
+        top = tk.Frame(level_card.body, bg=c["sidebar2"])
         top.pack(fill="x")
         self._sidebar_level_label = tk.Label(
-            top, text=f"LEVEL {level}", bg=c["sidebar2"], fg=c["primary_l"],
+            top, text=f"LEVEL {level}", bg=c["sidebar2"], fg=c["cyan"],
             font=(FONT_FAMILY, 8, "bold"), anchor="w")
         self._sidebar_level_label.pack(side="left")
         self._sidebar_level_name = tk.Label(
             top, text=level_name, bg=c["sidebar2"], fg=c["side_text2"],
-            font=f(8), anchor="e")
+            font=f(9), anchor="e")
         self._sidebar_level_name.pack(side="right")
-        self._sidebar_xp_fraction = min(1.0, xp_in / xp_for) if xp_for else 1.0
-        self._sidebar_bar = tk.Canvas(level_box, height=6, bg=c["sidebar2"],
-                                     highlightthickness=0, bd=0)
-        self._sidebar_bar.pack(fill="x", pady=(7, 5))
+        self._sidebar_fraction = min(1.0, xp_in / xp_for) if xp_for else 1.0
+        self._sidebar_bar = tk.Canvas(level_card.body, height=6, bg=c["sidebar2"],
+                                      highlightthickness=0, bd=0)
+        self._sidebar_bar.pack(fill="x", pady=(9, 6))
         self._sidebar_bar.bind("<Configure>", self._draw_sidebar_bar)
         self._sidebar_xp_label = tk.Label(
-            level_box, text=f"{xp:,} XP  ·  {max(0, xp_for - xp_in):,} to next",
-            bg=c["sidebar2"], fg=c["text3"], font=(FONT_FAMILY, 7), anchor="w")
+            level_card.body, text=f"{xp:,} XP  ·  {max(0, xp_for - xp_in):,} to next",
+            bg=c["sidebar2"], fg=c["text3"], font=(FONT_FAMILY, 8), anchor="w")
         self._sidebar_xp_label.pack(fill="x")
         self.root.after(60, self._draw_sidebar_bar)
 
         tk.Label(footer, text=f"v{VERSION}  ·  offline & private", bg=c["sidebar"],
-                 fg=c["text3"], font=(FONT_FAMILY, 7), anchor="w").pack(fill="x", pady=(10, 0))
+                 fg=c["text3"], font=(FONT_FAMILY, 8), anchor="w").pack(
+            fill="x", pady=(12, 0))
 
     def _draw_sidebar_bar(self, _event=None):
         bar = getattr(self, "_sidebar_bar", None)
@@ -3275,15 +4308,16 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
                 return
             width = bar.winfo_width() or 160
             bar.delete("all")
-            rrect(bar, 0, 0, width, 6, 3, fill=shade(self.c["sidebar2"], 2.1))
-            filled = max(6, width * self._sidebar_xp_fraction)
-            rrect(bar, 0, 0, filled, 6, 3, fill=self.c["primary"])
+            rrect(bar, 0, 0, width, 6, 3, fill=mix(self.c["sidebar2"], "#FFFFFF", 0.09))
+            if self._sidebar_fraction > 0.015:
+                rrect(bar, 0, 0, max(6, width * self._sidebar_fraction), 6, 3,
+                      fill=self.c["primary"])
         except tk.TclError:
             pass
 
     def _refresh_sidebar_xp(self):
         xp, level, level_name, xp_in, xp_for = self.dm.get_xp_info()
-        self._sidebar_xp_fraction = min(1.0, xp_in / xp_for) if xp_for else 1.0
+        self._sidebar_fraction = min(1.0, xp_in / xp_for) if xp_for else 1.0
         try:
             self._sidebar_level_label.configure(text=f"LEVEL {level}")
             self._sidebar_level_name.configure(text=level_name)
@@ -3295,37 +4329,44 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
 
     def _build_topbar(self):
         c = self.c
-        bar = tk.Frame(self.main, bg=c["bg"])
+        bar = tk.Frame(self.main, bg=c["bg"], height=64)
         bar.pack(fill="x")
-        inner = tk.Frame(bar, bg=c["bg"], height=70)
-        inner.pack(fill="x", padx=28, pady=(16, 10))
-        inner.pack_propagate(False)
+        bar.pack_propagate(False)
+        inner = tk.Frame(bar, bg=c["bg"])
+        inner.pack(fill="both", expand=True, padx=PAGE_PAD)
 
-        titles = tk.Frame(inner, bg=c["bg"])
-        titles.pack(side="left")
-        self.lbl_page = tk.Label(titles, text="Dashboard", bg=c["bg"], fg=c["text"],
-                                 font=f(17, "bold"), anchor="w")
-        self.lbl_page.pack(anchor="w")
-        self.lbl_subtitle = tk.Label(titles, text="", bg=c["bg"], fg=c["text2"],
-                                     font=f(9), anchor="w")
-        self.lbl_subtitle.pack(anchor="w")
+        left = tk.Frame(inner, bg=c["bg"])
+        left.pack(side="left", pady=20)
+        tk.Label(left, text=APP_NAME.upper(), bg=c["bg"], fg=c["text3"],
+                 font=(FONT_FAMILY, 8, "bold"), anchor="w").pack(side="left")
+        tk.Label(left, text="/", bg=c["bg"], fg=c["border_hi"],
+                 font=f(10)).pack(side="left", padx=9)
+        self.lbl_crumb = tk.Label(left, text="Dashboard", bg=c["bg"], fg=c["text2"],
+                                  font=f(10, "bold"), anchor="w")
+        self.lbl_crumb.pack(side="left")
 
         right = tk.Frame(inner, bg=c["bg"])
-        right.pack(side="right")
+        right.pack(side="right", pady=14)
 
         self.btn_theme = IconButton(
             right, self, "sun" if self._theme_name == "dark" else "moon",
-            command=self._toggle_theme, size=32, icon_size=16, bg=c["bg"],
-            color=c["text2"], hover_color=c["primary_l"],
+            command=self._toggle_theme, size=34, icon_size=17, bg=c["bg"],
+            color=c["text2"], hover_color=c["primary_l"], radius=9,
         )
-        self.btn_theme.pack(side="right", padx=(10, 0))
+        self.btn_theme.pack(side="right", padx=(12, 0))
 
-        self.lbl_clock = tk.Label(right, text="", bg=c["bg"], fg=c["text2"], font=f(9))
-        self.lbl_clock.pack(side="right", padx=(0, 4))
+        clock = tk.Frame(right, bg=c["bg"])
+        clock.pack(side="right", padx=(0, 6))
+        self.lbl_clock = tk.Label(clock, text="", bg=c["bg"], fg=c["text"],
+                                  font=f(11, "bold"), anchor="e")
+        self.lbl_clock.pack(anchor="e")
+        self.lbl_clock_date = tk.Label(clock, text="", bg=c["bg"], fg=c["text3"],
+                                       font=f(9), anchor="e")
+        self.lbl_clock_date.pack(anchor="e")
 
-        self._streak_chip = tk.Canvas(right, height=32, width=112, bg=c["bg"],
-                                     highlightthickness=0, bd=0)
-        self._streak_chip.pack(side="right", padx=(0, 12))
+        self._streak_chip = tk.Canvas(right, height=32, width=10, bg=c["bg"],
+                                      highlightthickness=0, bd=0)
+        self._streak_chip.pack(side="right", padx=(0, 14))
         self._draw_streak_chip()
 
         tk.Frame(self.main, bg=c["border"], height=1).pack(fill="x")
@@ -3334,22 +4375,19 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
         canvas = self._streak_chip
         c = self.c
         streak = self.dm.calculate_streak()
-        label = f"{streak} day{'s' if streak != 1 else ''}"
-        bold = tkfont.Font(family=FONT_FAMILY, size=9, weight="bold")
-        small = tkfont.Font(family=FONT_FAMILY, size=8)
-        # Size the chip to its text so it never overlaps the clock beside it.
-        text_x = 36
-        streak_x = text_x + bold.measure(label) + 5
-        width = streak_x + small.measure("streak") + 14
+        label = f"{streak}-day streak" if streak else "No streak yet"
+        font = tkfont.Font(family=FONT_FAMILY, size=10, weight="bold")
+        width = font.measure(label) + 52
         canvas.configure(width=width)
         canvas.delete("all")
-        rrect(canvas, 0, 0, width, 32, 16, fill=mix(c["warning"], c["bg"], 0.82),
-              outline=mix(c["border"], c["warning"], 0.35), width=1)
-        draw_icon(canvas, "flame", 20, 16, size=15, color=c["warning"], width=1.8)
-        canvas.create_text(text_x, 16, anchor="w", text=label,
-                           font=(FONT_FAMILY, 9, "bold"), fill=c["text"])
-        canvas.create_text(streak_x, 16, anchor="w", text="streak",
-                           font=(FONT_FAMILY, 8), fill=c["text2"])
+        highlight = streak > 0
+        color = c["warning"] if highlight else c["text2"]
+        rrect(canvas, 0, 0, width, 32, 16,
+              fill=mix(color, c["bg"], 0.86),
+              outline=mix(c["border"], color, 0.40 if highlight else 0.2), width=1)
+        draw_icon(canvas, "flame", 20, 16, size=15, color=color, width=1.8)
+        canvas.create_text(32, 16, anchor="w", text=label, font=font,
+                           fill=c["text"] if highlight else c["text2"])
 
     # -- navigation --------------------------------------------------
     def _show(self, view_name: str):
@@ -3361,10 +4399,14 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
         self._dashboard = {}
         self._task_scroll = None
         self._search_entry = None
+        self._habit_rows = {}
+        self._milestone_holder = None
 
         self._active_view = view_name
-        self.lbl_page.configure(text=view_name)
-        self.lbl_subtitle.configure(text=self.VIEW_SUBTITLES.get(view_name, ""))
+        try:
+            self.lbl_crumb.configure(text=view_name)
+        except (tk.TclError, AttributeError):
+            pass
         for name, button in self._nav_buttons.items():
             button.set_active(name == view_name)
         self._draw_streak_chip()
@@ -3387,308 +4429,8 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
             except tk.TclError:
                 pass
 
-    # -- dashboard ---------------------------------------------------
-    def _greeting(self):
-        hour = datetime.now().hour
-        if hour < 5:
-            return "Late night focus"
-        if hour < 12:
-            return "Good morning"
-        if hour < 17:
-            return "Good afternoon"
-        if hour < 22:
-            return "Good evening"
-        return "Winding down"
-
-    def _score_status(self, pct):
-        if pct >= 1.0:
-            return "Flawless day", self.c["success"]
-        if pct >= 0.8:
-            return "Elite progress", self.c["primary_l"]
-        if pct >= 0.5:
-            return "Strong momentum", self.c["primary"]
-        if pct > 0:
-            return "Warming up", self.c["warning"]
-        return "Ready when you are", self.c["text2"]
-
-    def _achievements(self):
-        dm = self.dm
-        best = dm.best_streak()
-        total = dm.total_checkins()
-        perfect = dm.perfect_days_total()
-        _xp, level, _lname, _in, _for = dm.get_xp_info()
-        consistency = dm.consistency(30)
-        return [
-            {"icon": "spark", "name": "First light", "desc": "Complete your first habit",
-             "earned": total >= 1, "progress": f"{min(total, 1)}/1"},
-            {"icon": "flame", "name": "Week of fire", "desc": "7 perfect days in a row",
-             "earned": best >= 7, "progress": f"{min(best, 7)}/7"},
-            {"icon": "trophy", "name": "Perfect day", "desc": "Finish every habit in a day",
-             "earned": perfect >= 1, "progress": f"{min(perfect, 1)}/1"},
-            {"icon": "target", "name": "Steady month", "desc": "80% consistency over 30 days",
-             "earned": consistency >= 0.8 and total >= 20,
-             "progress": f"{int(round(consistency * 100))}/80%"},
-            {"icon": "bolt", "name": "Level 5", "desc": "Reach level five",
-             "earned": level >= 5, "progress": f"L{level}/5"},
-            {"icon": "layers", "name": "Century", "desc": "100 habit check-ins",
-             "earned": total >= 100, "progress": f"{min(total, 100)}/100"},
-        ]
-
-    def _view_dashboard(self):
-        c = self.c
-        scroll = ScrollableFrame(self.content, c["bg"], padding=0,
-                                 track=mix(c["border"], c["bg"], 0.4),
-                                 thumb=c["border_hi"])
-        scroll.pack(fill="both", expand=True)
-        page = scroll.inner
-        pad = 28
-
-        tasks = self.dm.get_scheduled_today()
-        done_ids = self.dm.get_completed_today()
-        total = len(tasks)
-        done = sum(1 for t in tasks if t["id"] in done_ids)
-        pct = done / total if total else 0.0
-        streak = self.dm.calculate_streak()
-
-        # Header
-        header = tk.Frame(page, bg=c["bg"])
-        header.pack(fill="x", padx=pad, pady=(22, 0))
-        left = tk.Frame(header, bg=c["bg"])
-        left.pack(side="left")
-        tk.Label(left, text=self._greeting(), bg=c["bg"], fg=c["text"],
-                 font=f(23, "bold"), anchor="w").pack(anchor="w")
-        today = date.today()
-        date_line = f"{WEEKDAY_FULL[today.weekday()]}, {today.strftime('%d %B %Y')}"
-        tk.Label(left, text=date_line, bg=c["bg"], fg=c["text2"], font=f(10),
-                 anchor="w").pack(anchor="w", pady=(2, 0))
-        HoverButton(header, self, "New habit", command=self._open_add_task, icon="plus",
-                    kind="primary", bg=c["bg"], height=38).pack(side="right", pady=6)
-
-        # Hero
-        hero = Card(page, self, radius=20, padding=(24, 22), glow=True)
-        hero.pack(fill="x", padx=pad, pady=(16, 0))
-        hero.body.columnconfigure(0, weight=0)
-        hero.body.columnconfigure(1, weight=1)
-
-        ring = ProgressRing(hero.body, self, size=168, thickness=12, pct=pct,
-                            bg=c["card"], caption="today's habits")
-        ring.grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 26))
-
-        score_box = tk.Frame(hero.body, bg=c["card"])
-        score_box.grid(row=0, column=1, sticky="ew")
-        tk.Label(score_box, text="DAILY SCORE", bg=c["card"], fg=c["text3"],
-                 font=(FONT_FAMILY, 8, "bold"), anchor="w").pack(anchor="w")
-        score_row = tk.Frame(score_box, bg=c["card"])
-        score_row.pack(fill="x", pady=(0, 2))
-        status_text, status_color = self._score_status(pct)
-        score_value = tk.Label(score_row, text=str(int(round(pct * 100))), bg=c["card"],
-                               fg=c["text"], font=f(34, "bold"))
-        score_value.pack(side="left")
-        tk.Label(score_row, text="/100", bg=c["card"], fg=c["text3"],
-                 font=f(12)).pack(side="left", pady=(12, 0), padx=(4, 10))
-        status = tk.Label(score_row, text=status_text, bg=c["card"], fg=status_color,
-                          font=f(10, "bold"))
-        status.pack(side="left", pady=(12, 0))
-
-        if total == 0:
-            summary_text = "No habits scheduled today."
-        elif done == total:
-            summary_text = f"All {total} habits complete. Perfect day secured."
-        else:
-            summary_text = f"{done} of {total} habits complete  ·  {total - done} to go"
-        summary = tk.Label(score_box, text=summary_text, bg=c["card"], fg=c["text2"],
-                           font=f(10), anchor="w")
-        summary.pack(anchor="w", pady=(0, 12))
-
-        chips = tk.Frame(score_box, bg=c["card"])
-        chips.pack(anchor="w")
-        chip_data = [
-            ("check", f"{done} done", c["success"]),
-            ("target", f"{max(0, total - done)} remaining", c["warning"] if total - done else c["text2"]),
-            ("flame", f"{streak} day streak", c["primary_l"]),
-        ]
-        for icon, text, color in chip_data:
-            chip = tk.Frame(chips, bg=mix(color, c["card"], 0.86), padx=9, pady=4)
-            chip.pack(side="left", padx=(0, 8))
-            icon_canvas = tk.Canvas(chip, width=14, height=14, bg=chip.cget("bg"),
-                                    highlightthickness=0, bd=0)
-            icon_canvas.pack(side="left", padx=(0, 5))
-            draw_icon(icon_canvas, icon, 7, 7, size=12, color=color, width=1.8)
-            tk.Label(chip, text=text, bg=chip.cget("bg"), fg=color,
-                     font=f(8, "bold")).pack(side="left")
-
-        actions = tk.Frame(hero.body, bg=c["card"])
-        actions.grid(row=1, column=1, sticky="ew", pady=(16, 0))
-        HoverButton(actions, self, "Today's habits", command=lambda: self._show("Habits"),
-                    icon="arrow-right", kind="soft", bg=c["card"], height=34,
-                    font_size=9).pack(side="left")
-        mark_all = HoverButton(actions, self, "Complete all", command=self._shortcut_mark_all,
-                               icon="check", kind="ghost", bg=c["card"], height=34,
-                               font_size=9)
-        mark_all.pack(side="left", padx=(8, 0))
-        if total == 0 or done == total:
-            mark_all.set_enabled(False)
-
-        self._dashboard.update({
-            "ring": ring,
-            "score": score_value,
-            "status": status,
-            "summary": summary,
-            "streak_chip": chips,
-            "mark_all": mark_all,
-        })
-
-        # KPI tiles
-        kpis = tk.Frame(page, bg=c["bg"])
-        kpis.pack(fill="x", padx=pad, pady=(14, 0))
-        week = self.dm.get_week_pcts()
-        week_avg = round(sum(week) / 7) if week else 0
-        _xp, level, level_name, _in, _for = self.dm.get_xp_info()
-        best = self.dm.best_streak()
-        tiles = [
-            ("flame", f"{streak}", "Current streak", "days in a row", c["warning"]),
-            ("trophy", f"{best}", "Best streak", "personal record", c["primary_l"]),
-            ("chart", f"{week_avg}%", "Weekly average", "Mon to Sun", c["accent"]),
-            ("bolt", f"L{level}", "Level", level_name, c["purple_l"]),
-        ]
-        for index, (icon, value, label, hint, color) in enumerate(tiles):
-            tile = Card(kpis, self, radius=14, padding=(16, 14))
-            tile.grid(row=0, column=index, sticky="nsew",
-                      padx=(0 if index == 0 else 10, 0))
-            kpis.columnconfigure(index, weight=1, uniform="kpi")
-            row = tk.Frame(tile.body, bg=c["card"])
-            row.pack(fill="x")
-            IconTile(row, self, icon, color=color, size=34, bg=c["card"]).pack(side="left")
-            value_box = tk.Frame(row, bg=c["card"])
-            value_box.pack(side="left", padx=10)
-            tk.Label(value_box, text=value, bg=c["card"], fg=c["text"],
-                     font=f(18, "bold"), anchor="w").pack(anchor="w")
-            tk.Label(value_box, text=label, bg=c["card"], fg=c["text2"],
-                     font=f(8), anchor="w").pack(anchor="w")
-            tk.Label(tile.body, text=hint, bg=c["card"], fg=c["text3"],
-                     font=f(8), anchor="w").pack(anchor="w", pady=(8, 0))
-
-        # Two-column body
-        columns = tk.Frame(page, bg=c["bg"])
-        columns.pack(fill="both", expand=True, padx=pad, pady=(14, 0))
-        columns.columnconfigure(0, weight=3, uniform="cols")
-        columns.columnconfigure(1, weight=2, uniform="cols")
-
-        # Today's focus
-        focus = Card(columns, self, radius=16, padding=(18, 16))
-        focus.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
-        focus_header = tk.Frame(focus.body, bg=c["card"])
-        focus_header.pack(fill="x")
-        tk.Label(focus_header, text="Today's focus", bg=c["card"], fg=c["text"],
-                 font=f(12, "bold"), anchor="w").pack(side="left")
-        view_all = tk.Label(focus_header, text="View all", bg=c["card"], fg=c["primary_l"],
-                            font=f(9, "bold"), cursor="hand2")
-        view_all.pack(side="right")
-        view_all.bind("<Button-1>", lambda _e: self._show("Habits"))
-        tk.Label(focus.body, text=f"{done} of {total} complete", bg=c["card"], fg=c["text2"],
-                 font=f(9), anchor="w").pack(anchor="w", pady=(2, 10))
-
-        if not tasks:
-            self._empty_state(focus.body, self.c["card"], "No habits scheduled today",
-                              "Add a habit or adjust its repeat settings to see it here.",
-                              button_text="Add a habit", command=self._open_add_task)
-        else:
-            for task in tasks[:6]:
-                row = HabitRow(focus.body, self, task, task["id"] in done_ids,
-                               stats=self.dm.habit_stats(task, 30), on_toggle=self._toggle_from_list,
-                               compact=True)
-                row.pack(fill="x", pady=3)
-                self._dashboard_rows[task["id"]] = row
-            if len(tasks) > 6:
-                more = tk.Label(focus.body, text=f"+{len(tasks) - 6} more habits",
-                                bg=c["card"], fg=c["text3"], font=f(9), anchor="w")
-                more.pack(anchor="w", pady=(8, 0))
-
-        # Right column
-        right = tk.Frame(columns, bg=c["bg"])
-        right.grid(row=0, column=1, sticky="nsew")
-
-        week_card = Card(right, self, radius=16, padding=(18, 16))
-        week_card.pack(fill="x")
-        week_header = tk.Frame(week_card.body, bg=c["card"])
-        week_header.pack(fill="x")
-        tk.Label(week_header, text="This week", bg=c["card"], fg=c["text"],
-                 font=f(12, "bold"), anchor="w").pack(side="left")
-        tk.Label(week_header, text=f"{week_avg}% avg", bg=c["card"], fg=c["primary_l"],
-                 font=f(9, "bold"), anchor="e").pack(side="right")
-        labels = [day.strftime("%a") for day in self.dm.get_week_dates()]
-        bars = WeekBars(week_card.body, self, height=132, values=week, labels=labels,
-                        highlight=date.today().weekday(), bg=c["card"])
-        bars.pack(fill="x", pady=(10, 0))
-
-        milestone_card = Card(right, self, radius=16, padding=(18, 16))
-        milestone_card.pack(fill="x", pady=(12, 0))
-        header = tk.Frame(milestone_card.body, bg=c["card"])
-        header.pack(fill="x", pady=(0, 8))
-        tk.Label(header, text="Milestones", bg=c["card"], fg=c["text"],
-                 font=f(12, "bold"), anchor="w").pack(side="left")
-        earned_count = sum(1 for item in self._achievements() if item["earned"])
-        tk.Label(header, text=f"{earned_count}/{len(self._achievements())}", bg=c["card"],
-                 fg=c["text2"], font=f(9), anchor="e").pack(side="right")
-        for item in self._achievements()[:4]:
-            self._achievement_row(milestone_card.body, item, compact=True)
-
-        # Quote
-        quote, author = self.dm.get_daily_quote()
-        quote_card = Card(page, self, radius=16, padding=(20, 16), fill=c["surface"])
-        quote_card.pack(fill="x", padx=pad, pady=(14, 24))
-        quote_row = tk.Frame(quote_card.body, bg=c["surface"])
-        quote_row.pack(fill="x")
-        mark = tk.Canvas(quote_row, width=26, height=26, bg=c["surface"],
-                         highlightthickness=0, bd=0)
-        mark.pack(side="left", padx=(0, 12), anchor="n")
-        draw_icon(mark, "spark", 13, 13, size=16, color=c["purple_l"], width=1.6)
-        text_box = tk.Frame(quote_row, bg=c["surface"])
-        text_box.pack(side="left", fill="x", expand=True)
-        tk.Label(text_box, text=f"“{quote}”", bg=c["surface"], fg=c["text"],
-                 font=f(11, "normal", "italic"), wraplength=780,
-                 justify="left", anchor="w").pack(anchor="w")
-        tk.Label(text_box, text=f"— {author}", bg=c["surface"], fg=c["text2"],
-                 font=f(9), anchor="w").pack(anchor="w", pady=(4, 0))
-
-    def _achievement_row(self, parent, item, compact=False):
-        c = self.c
-        bg = parent.cget("bg")
-        row = tk.Frame(parent, bg=bg)
-        row.pack(fill="x", pady=2)
-        color = c["primary_l"] if item["earned"] else c["text3"]
-        IconTile(row, self, item["icon"], color=color, size=28,
-                 bg=bg, soft=True, icon_size=15).pack(side="left", padx=(0, 9))
-        text_box = tk.Frame(row, bg=bg)
-        text_box.pack(side="left", fill="x", expand=True)
-        tk.Label(text_box, text=item["name"], bg=bg,
-                 fg=c["text"] if item["earned"] else c["text2"],
-                 font=f(9, "bold"), anchor="w").pack(anchor="w")
-        if not compact:
-            tk.Label(text_box, text=item["desc"], bg=bg, fg=c["text3"],
-                     font=f(8), anchor="w").pack(anchor="w")
-        state = tk.Label(row, text=item["progress"] if not item["earned"] else "Earned",
-                         bg=bg, fg=c["success"] if item["earned"] else c["text3"],
-                         font=f(8, "bold"))
-        state.pack(side="right")
-
-    def _empty_state(self, parent, bg, title, description, button_text=None, command=None,
-                     icon="spark"):
-        box = tk.Frame(parent, bg=bg)
-        box.pack(fill="x", pady=18)
-        canvas = tk.Canvas(box, width=52, height=52, bg=bg, highlightthickness=0, bd=0)
-        canvas.pack()
-        rrect(canvas, 0, 0, 52, 52, 16, fill=mix(self.c["primary"], bg, 0.88))
-        draw_icon(canvas, icon, 26, 26, size=22, color=self.c["primary_l"], width=1.7)
-        tk.Label(box, text=title, bg=bg, fg=self.c["text"], font=f(11, "bold")).pack(pady=(8, 2))
-        tk.Label(box, text=description, bg=bg, fg=self.c["text2"], font=f(9),
-                 wraplength=320, justify="center").pack()
-        if button_text and command:
-            HoverButton(box, self, button_text, command=command, icon="plus",
-                        kind="soft", bg=bg, height=34, font_size=9).pack(pady=(12, 0))
-
     # -- completion handling -----------------------------------------
-    def _toggle_from_list(self, task, control):
+    def _toggle_task(self, task):
         done_ids = self.dm.get_completed_today()
         new_state = task["id"] not in done_ids
         self.dm.toggle_task(task["id"], new_state)
@@ -3702,63 +4444,17 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
             self.toast(f"{task['name']} complete  ·  +{XP_PER_TASK} XP", "success")
         if self._active_view == "Dashboard":
             self._refresh_dashboard_progress()
+            self._refresh_sidebar_xp()
         elif self._active_view == "Habits":
             self._update_habit_header()
             self._draw_streak_chip()
+            self._refresh_sidebar_xp()
+            summary = getattr(self, "_habit_summary_bar", None)
         elif self._active_view == "Calendar":
             self._render_calendar()
-        self._refresh_sidebar_xp()
-
-    def _refresh_dashboard_progress(self):
-        state = self._dashboard
-        if not state:
-            return
-        tasks = self.dm.get_scheduled_today()
-        done_ids = self.dm.get_completed_today()
-        total = len(tasks)
-        done = sum(1 for t in tasks if t["id"] in done_ids)
-        pct = done / total if total else 0.0
-        streak = self.dm.calculate_streak()
-        status_text, status_color = self._score_status(pct)
-
-        state["ring"].animate_to(pct)
-        state["ring"].set_labels(caption="today's habits")
-        state["score"].configure(text=str(int(round(pct * 100))))
-        state["status"].configure(text=status_text, fg=status_color)
-        if total == 0:
-            summary = "No habits scheduled today."
-        elif done == total:
-            summary = f"All {total} habits complete. Perfect day secured."
+            self._refresh_sidebar_xp()
         else:
-            summary = f"{done} of {total} habits complete  ·  {total - done} to go"
-        state["summary"].configure(text=summary)
-        state["mark_all"].set_enabled(0 < total and done < total)
-        self._draw_streak_chip()
-        for task in tasks:
-            row = self._dashboard_rows.get(task["id"])
-            if row is not None:
-                row.set_done(task["id"] in done_ids,
-                             stats=self.dm.habit_stats(task, 30))
-
-        # counters inside the hero chips are rebuilt on next view; refresh in place
-        chips = state.get("streak_chip")
-        if chips is not None:
-            for child in list(chips.winfo_children()):
-                child.destroy()
-            for icon, text, color in (
-                ("check", f"{done} done", self.c["success"]),
-                ("target", f"{max(0, total - done)} remaining",
-                 self.c["warning"] if total - done else self.c["text2"]),
-                ("flame", f"{streak} day streak", self.c["primary_l"]),
-            ):
-                chip = tk.Frame(chips, bg=mix(color, self.c["card"], 0.86), padx=9, pady=4)
-                chip.pack(side="left", padx=(0, 8))
-                icon_canvas = tk.Canvas(chip, width=14, height=14, bg=chip.cget("bg"),
-                                        highlightthickness=0, bd=0)
-                icon_canvas.pack(side="left", padx=(0, 5))
-                draw_icon(icon_canvas, icon, 7, 7, size=12, color=color, width=1.8)
-                tk.Label(chip, text=text, bg=chip.cget("bg"), fg=color,
-                         font=f(8, "bold")).pack(side="left")
+            self._refresh_sidebar_xp()
 
     # -- habit actions ------------------------------------------------
     def _open_add_task(self, _event=None):
@@ -3778,8 +4474,8 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
     def _delete_task(self, task):
         if messagebox.askyesno("Delete habit",
                                f"Delete “{task['name']}”?\n\n"
-                               "Its completion history for this habit will be removed too.",
-                               parent=self.root):
+                               "Its completion history for this habit will be "
+                               "removed too.", parent=self.root):
             self.dm.delete_task(task["id"])
             self._show(self._active_view or "Habits")
             self.toast("Habit deleted", "danger")
@@ -3795,7 +4491,8 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
             self.dm.toggle_task(task["id"], True)
         self.dm.award_perfect_day_if_due()
         self._show(self._active_view or "Dashboard")
-        self.toast(f"{len(pending)} habit{'s' if len(pending) != 1 else ''} completed", "success")
+        self.toast(f"{len(pending)} habit{'s' if len(pending) != 1 else ''} completed",
+                   "success")
 
     # -- theme --------------------------------------------------------
     def _toggle_theme(self):
@@ -3822,13 +4519,13 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
         self._build_layout()
         self._show(view)
 
-    # -- clock --------------------------------------------------------
+    # -- clock ---------------------------------------------------------
     def _tick_clock(self):
         now = datetime.now()
-        text = now.strftime("%H:%M") + "  ·  " + now.strftime("%d %b")
         try:
             if hasattr(self, "lbl_clock") and self.lbl_clock.winfo_exists():
-                self.lbl_clock.configure(text=text)
+                self.lbl_clock.configure(text=now.strftime("%H:%M"))
+                self.lbl_clock_date.configure(text=now.strftime("%a %d %b"))
             self._clock_job = self.root.after(20000, self._tick_clock)
         except tk.TclError:
             pass
@@ -3843,8 +4540,9 @@ class HabitFlowApp(HabitsViewMixin, StatsViewMixin, SettingsViewMixin):
             self.dm.save()
         finally:
             self.root.destroy()
+
+
 # ==================================================================
-# ENTRY POINT# ==================================================================
 # ENTRY POINT
 # ==================================================================
 def main():
