@@ -1,35 +1,40 @@
-import { CalendarCheck, Flame, Layers, Sparkles, Trophy } from 'lucide-react'
+import { CalendarCheck, Flame, Layers, Lock, Sparkles, Trophy } from 'lucide-react'
 import type { AchievementCode } from '../lib/types'
 import { cx } from './ui'
 
 export const ACHIEVEMENT_META: Record<
   AchievementCode,
-  { title: string; description: string; icon: typeof Sparkles }
+  { title: string; description: string; icon: typeof Sparkles; tone: string }
 > = {
   first_light: {
     title: 'First light',
     description: 'Complete your first habit',
     icon: Sparkles,
+    tone: '#38E8FF',
   },
   perfect_day: {
     title: 'Perfect day',
     description: 'Finish every habit scheduled for a day',
     icon: CalendarCheck,
+    tone: '#3CE6A0',
   },
   week_streak: {
     title: 'Week of fire',
     description: 'Seven consecutive perfect days',
     icon: Flame,
+    tone: '#FFB84D',
   },
   month_streak: {
     title: 'Month in motion',
     description: 'Thirty consecutive perfect days',
     icon: Trophy,
+    tone: '#8B5CF6',
   },
   century: {
     title: 'Century',
     description: 'One hundred logged completions',
     icon: Layers,
+    tone: '#FFC857',
   },
 }
 
@@ -53,27 +58,43 @@ export function AchievementStrip({ earned }: { earned: Set<AchievementCode> }) {
             key={code}
             title={meta.description}
             className={cx(
-              'flex flex-col gap-2 rounded-xl border p-3 transition',
+              'relative overflow-hidden rounded-xl border p-3 transition',
               unlocked
-                ? 'border-neon/30 bg-neon/[0.07]'
-                : 'border-white/[0.06] bg-white/[0.015] opacity-70',
+                ? 'border-white/[0.12] bg-white/[0.04]'
+                : 'border-white/[0.06] bg-white/[0.012] opacity-70',
             )}
           >
+            {unlocked ? (
+              <span
+                className="pointer-events-none absolute inset-x-3 top-0 h-px"
+                style={{ background: `linear-gradient(90deg, transparent, ${meta.tone}, transparent)` }}
+              />
+            ) : null}
             <span
               className={cx(
-                'grid h-8 w-8 place-items-center rounded-lg border',
-                unlocked
-                  ? 'border-neon/40 bg-neon/15 text-neon'
-                  : 'border-white/10 bg-white/[0.03] text-slate-500',
+                'hex grid h-9 w-9 place-items-center border',
+                unlocked ? 'border-transparent' : 'border-white/10 bg-white/[0.03] text-slate-600',
               )}
+              style={
+                unlocked
+                  ? {
+                      background: `linear-gradient(150deg, ${meta.tone}40, ${meta.tone}10)`,
+                      color: meta.tone,
+                      boxShadow: `0 0 20px -6px ${meta.tone}`,
+                    }
+                  : undefined
+              }
             >
-              <Icon size={15} />
+              {unlocked ? <Icon size={15} /> : <Lock size={13} />}
             </span>
-            <div>
-              <div className={cx('text-xs font-semibold', unlocked ? 'text-slate-100' : 'text-slate-400')}>
+            <div className="mt-2">
+              <div className={cx('text-[11px] font-bold', unlocked ? 'text-slate-100' : 'text-slate-400')}>
                 {meta.title}
               </div>
-              <div className="mt-0.5 text-[10px] leading-snug text-slate-500">
+              <div
+                className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.12em]"
+                style={{ color: unlocked ? meta.tone : '#475569' }}
+              >
                 {unlocked ? 'Unlocked' : 'Locked'}
               </div>
             </div>

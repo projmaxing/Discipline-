@@ -1,59 +1,91 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, Flame, ShieldCheck, Sparkles, Trophy, Users } from 'lucide-react'
+import { ArrowRight, ChevronRight, Crown, Flame, Lock, ShieldCheck, Swords, Trophy, Users, Zap } from 'lucide-react'
 import { useAuth } from '../context/AuthProvider'
+import { isConfigured } from '../lib/supabase'
+import { ProgressRing } from '../components/ui'
 
 const FEATURES = [
   {
     icon: Flame,
-    title: 'Streaks that hold you',
-    body: 'Perfect days build streaks, and streaks become the score you defend.',
+    title: 'Streaks that bite',
+    body: 'Perfect days stack into streaks, and a single missed day resets the run. The chain is the game.',
+    tone: '#FFB84D',
   },
   {
     icon: Users,
-    title: 'Friends, not followers',
-    body: 'Mutual friend requests only. Compare consistency without exposing habit names.',
+    title: 'Squad, not followers',
+    body: 'Mutual requests only. Compare consistency with people who actually know you.',
+    tone: '#38E8FF',
   },
   {
     icon: Trophy,
-    title: 'Trusted leaderboards',
-    body: 'Scores are derived from logged completions by the database, never the browser.',
+    title: 'Ranked ladder',
+    body: 'Points come from validated completions, computed by the database — never by the browser.',
+    tone: '#C4B0FF',
   },
   {
     icon: ShieldCheck,
-    title: 'Row Level Security',
-    body: 'Every table is protected by policies, and friends only ever receive aggregates.',
+    title: 'Private by default',
+    body: 'Friends get aggregates. Habit names, notes and schedules never leave your account.',
+    tone: '#3CE6A0',
   },
+]
+
+const DEMO_QUESTS = [
+  { name: 'Morning run', xp: '+10 XP', done: true },
+  { name: 'Deep work block', xp: '+10 XP', done: true },
+  { name: 'Read 20 pages', xp: '+10 XP', done: true },
+  { name: 'Sleep before midnight', xp: '+10 XP', done: false },
+]
+
+const DEMO_LADDER = [
+  { rank: 1, name: 'you', points: '1240' },
+  { rank: 2, name: 'mara', points: '1180' },
+  { rank: 3, name: 'dev', points: '960' },
 ]
 
 export function Landing() {
   const { session } = useAuth()
-  const [ready] = useState(true)
+  const primaryTo = isConfigured ? (session ? '/dashboard' : '/register') : '/setup'
+  const primaryLabel = isConfigured ? (session ? 'Enter command center' : 'Start season 01') : 'Connect backend'
 
   return (
     <div className="min-h-screen">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-        <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-xl border border-neon/40 bg-neon/15 text-neon">
-            <Sparkles size={17} />
-          </div>
-          <div>
-            <div className="font-display text-sm font-bold text-slate-50">HabitFlow</div>
-            <div className="text-[9px] uppercase tracking-[0.18em] text-slate-500">Social command center</div>
-          </div>
-        </div>
+        <Link to="/" className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-neon-sweep text-[#04121B] shadow-neon">
+            <Swords size={19} strokeWidth={2.5} />
+          </span>
+          <span>
+            <span className="block font-display text-[15px] font-extrabold tracking-tight text-slate-50">HabitFlow</span>
+            <span className="block text-[9px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+              Social command center
+            </span>
+          </span>
+        </Link>
         <nav className="flex items-center gap-2">
-          {session ? (
-            <Link to="/dashboard" className="btn-primary">
-              Open dashboard <ArrowRight size={15} />
-            </Link>
+          {isConfigured ? (
+            session ? (
+              <Link to="/dashboard" className="btn-primary">
+                Command center <ArrowRight size={15} />
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" className="btn-ghost">
+                  Sign in
+                </Link>
+                <Link to="/register" className="btn-primary">
+                  Play now
+                </Link>
+              </>
+            )
           ) : (
             <>
-              <Link to="/login" className="btn-ghost">
-                Sign in
-              </Link>
-              <Link to="/register" className="btn-primary">
-                Create account
+              <span className="chip-live hidden sm:inline-flex">
+                <span className="h-1.5 w-1.5 animate-breathe rounded-full bg-mint" /> Preview
+              </span>
+              <Link to="/setup" className="btn-ghost">
+                <Lock size={14} /> Setup
               </Link>
             </>
           )}
@@ -61,71 +93,115 @@ export function Landing() {
       </header>
 
       <main className="mx-auto max-w-6xl px-5 pb-20">
-        <section className="rise grid gap-10 py-14 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <section className="rise grid gap-12 py-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-16">
           <div>
-            <span className="chip mb-5">
-              <Flame size={12} className="text-amber" /> Discipline, with witnesses
+            <span className="chip border-cyan/25 bg-cyan/10 text-cyan">
+              <span className="h-1.5 w-1.5 animate-breathe rounded-full bg-cyan" /> Season 01 · live ladder
             </span>
-            <h1 className="font-display text-4xl font-bold leading-[1.05] text-slate-50 sm:text-5xl">
-              Turn consistency into a
-              <span className="bg-gradient-to-r from-neon via-cyan to-violet-soft bg-clip-text text-transparent"> leaderboard</span>.
+            <h1 className="mt-5 font-display text-[2.7rem] font-extrabold leading-[1.02] tracking-tight text-slate-50 sm:text-6xl">
+              Discipline is a
+              <span className="glow-text"> multiplayer game</span>.
             </h1>
             <p className="mt-5 max-w-xl text-sm leading-relaxed text-slate-400">
-              HabitFlow is a habit tracker with a social layer that respects your privacy. Track daily habits and
-              streaks, add real friends, and compare completion rates — never raw habit names.
+              Turn your routines into quests, stack perfect days into streaks, and defend your rank against a squad
+              that actually knows you. Private by design — nobody sees your habit names.
             </p>
+
             <div className="mt-7 flex flex-wrap items-center gap-3">
-              <Link to={session ? '/dashboard' : '/register'} className="btn-primary">
-                {session ? 'Go to dashboard' : 'Start tracking'} <ArrowRight size={16} />
+              <Link to={primaryTo} className="btn-primary">
+                {primaryLabel} <ChevronRight size={16} />
               </Link>
-              <Link to="/login" className="btn-ghost">
-                I already have an account
-              </Link>
+              {isConfigured ? (
+                <Link to="/login" className="btn-ghost">
+                  I already play
+                </Link>
+              ) : (
+                <Link to="/setup" className="btn-ghost">
+                  What do I need?
+                </Link>
+              )}
             </div>
-            <p className="mt-4 text-[11px] text-slate-600">
-              {ready ? 'No credit card, no ads, no public habit titles.' : ''}
-            </p>
+
+            {!isConfigured ? (
+              <p className="mt-4 max-w-md text-[11px] leading-relaxed text-amber/80">
+                Preview build — the interface is live, but accounts and persistence activate once a Supabase project is
+                connected. Nothing here pretends to save data.
+              </p>
+            ) : null}
+
+            <dl className="mt-8 grid max-w-md grid-cols-3 gap-3">
+              {[
+                ['10 XP', 'per quest'],
+                ['50 XP', 'perfect day'],
+                ['0', 'habit names shared'],
+              ].map(([value, label]) => (
+                <div key={label} className="tile p-3" style={{ ['--tone' as string]: 'rgba(76,141,255,.6)' } as never}>
+                  <dt className="font-display text-lg font-extrabold text-slate-50">{value}</dt>
+                  <dd className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-slate-500">{label}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
-          <div className="glass p-5">
-            <div className="flex items-center justify-between">
+          <div className="hud relative overflow-hidden p-5 sm:p-6">
+            <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 animate-drift rounded-full bg-neon/25 blur-3xl" />
+            <div className="relative flex items-center justify-between">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.16em] text-cyan">Today's progress</div>
-                <div className="mt-1 font-display text-3xl font-bold text-slate-50">86%</div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.24em] text-cyan">Today · quest log</div>
+                <div className="mt-1 font-display text-xl font-extrabold text-slate-50">Season run</div>
+                <div className="mt-1 flex items-center gap-1.5 text-[11px] text-amber">
+                  <Flame size={12} /> 12-day streak
+                </div>
               </div>
-              <div className="grid h-16 w-16 place-items-center rounded-full border-4 border-neon/30 border-t-neon text-xs font-semibold text-slate-200">
-                6/7
-              </div>
+              <ProgressRing pct={86} size={112} stroke={9} caption="complete" />
             </div>
-            <div className="mt-5 space-y-2.5">
-              {[
-                ['Morning run', true],
-                ['Deep work block', true],
-                ['Read 20 pages', true],
-                ['Sleep before midnight', false],
-              ].map(([label, done]) => (
-                <div
-                  key={String(label)}
-                  className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
-                >
+
+            <div className="relative mt-5 space-y-2">
+              {DEMO_QUESTS.map((quest) => (
+                <div key={quest.name} className="flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5">
                   <span
                     className={
-                      done
-                        ? 'grid h-5 w-5 place-items-center rounded-md bg-mint text-ink-950'
-                        : 'h-5 w-5 rounded-md border border-white/20'
+                      quest.done
+                        ? 'grid h-6 w-6 place-items-center rounded-md bg-mint text-[#04121B] shadow-[0_0_14px_rgba(60,230,160,.5)]'
+                        : 'h-6 w-6 rounded-md border border-white/20 bg-black/40'
                     }
                   >
-                    {done ? '✓' : ''}
+                    {quest.done ? <span className="text-[11px] font-bold">✓</span> : null}
                   </span>
-                  <span className="text-xs text-slate-300">{String(label)}</span>
+                  <span className={quest.done ? 'flex-1 text-xs text-slate-400 line-through' : 'flex-1 text-xs text-slate-200'}>
+                    {quest.name}
+                  </span>
+                  <span className="font-mono text-[9px] text-cyan">{quest.xp}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-5 flex items-center justify-between rounded-xl border border-amber/20 bg-amber/[0.06] px-3 py-2.5">
-              <span className="inline-flex items-center gap-2 text-xs text-amber">
-                <Flame size={14} /> 12-day streak
-              </span>
-              <span className="text-[10px] text-slate-500">2 friends close behind</span>
+
+            <div className="relative mt-5">
+              <div className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-[0.16em]">
+                <span className="text-cyan">Lv 6 · Strategist</span>
+                <span className="font-mono text-slate-500">420/500 XP</span>
+              </div>
+              <div className="xp-track mt-2">
+                <span className="xp-fill" style={{ width: '84%' }} />
+              </div>
+            </div>
+
+            <div className="relative mt-5">
+              <div className="divider-glow mb-3" />
+              <div className="space-y-1.5">
+                {DEMO_LADDER.map((row) => (
+                  <div key={row.rank} className="flex items-center gap-2.5 text-[11px]">
+                    <span className="grid h-5 w-5 place-items-center rounded-md border border-white/10 font-mono text-[9px] text-slate-400">
+                      {row.rank}
+                    </span>
+                    <span className={row.name === 'you' ? 'flex-1 font-semibold text-cyan' : 'flex-1 text-slate-400'}>
+                      @{row.name}
+                    </span>
+                    <span className="font-mono text-slate-300">{row.points}</span>
+                    {row.rank === 1 ? <Crown size={12} className="text-gold" /> : null}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -134,16 +210,44 @@ export function Landing() {
           {FEATURES.map((feature) => {
             const Icon = feature.icon
             return (
-              <div key={feature.title} className="panel p-4">
-                <span className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-neon">
+              <div key={feature.title} className="tile p-4" style={{ ['--tone' as string]: feature.tone } as never}>
+                <span
+                  className="grid h-9 w-9 place-items-center rounded-xl border"
+                  style={{ borderColor: `${feature.tone}44`, background: `${feature.tone}14`, color: feature.tone }}
+                >
                   <Icon size={16} />
                 </span>
-                <h2 className="mt-3 text-sm font-semibold text-slate-100">{feature.title}</h2>
-                <p className="mt-1 text-xs leading-relaxed text-slate-500">{feature.body}</p>
+                <h2 className="mt-3 font-display text-sm font-bold text-slate-100">{feature.title}</h2>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{feature.body}</p>
               </div>
             )
           })}
         </section>
+
+        <section className="hud relative mt-10 overflow-hidden p-7 text-center sm:p-10">
+          <div className="pointer-events-none absolute inset-x-0 -bottom-24 h-48 bg-neon/10 blur-3xl" />
+          <h2 className="relative font-display text-2xl font-extrabold text-slate-50 sm:text-3xl">
+            Your streak is waiting.
+          </h2>
+          <p className="relative mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">
+            One quest today is enough to start. Twelve days from now it is a rank.
+          </p>
+          <div className="relative mt-6 flex flex-wrap justify-center gap-3">
+            <Link to={primaryTo} className="btn-primary">
+              <Zap size={15} /> {primaryLabel}
+            </Link>
+            <Link to="/setup" className="btn-ghost">
+              How it works
+            </Link>
+          </div>
+        </section>
+
+        <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-600">
+          <span>HabitFlow · social command center</span>
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck size={11} /> row level security
+          </span>
+        </footer>
       </main>
     </div>
   )

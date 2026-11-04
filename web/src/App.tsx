@@ -28,7 +28,17 @@ function Protected() {
 }
 
 export default function App() {
-  if (!isConfigured) return <Setup />
+  // Without credentials the marketing site still renders (so the design can be
+  // reviewed), but every account route points at the setup screen. Nothing
+  // pretends that auth or persistence works.
+  if (!isConfigured) {
+    return (
+      <Routes>
+        <Route path="/setup" element={<Setup />} />
+        <Route path="*" element={<Landing />} />
+      </Routes>
+    )
+  }
 
   return (
     <Routes>

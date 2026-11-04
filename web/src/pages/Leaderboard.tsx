@@ -6,7 +6,6 @@ import { fetchLeaderboard } from '../lib/data'
 import type { LeaderboardRow } from '../lib/types'
 import {
   Avatar,
-  Button,
   Card,
   EmptyState,
   ErrorNote,
@@ -17,6 +16,12 @@ import {
 } from '../components/ui'
 
 type Scope = 'friends' | 'global'
+
+const PODIUM = [
+  { place: 2, ring: 'medal-ring-silver', height: 'h-20', color: '#CBD5E1' },
+  { place: 1, ring: 'medal-ring-gold', height: 'h-28', color: '#FFC857' },
+  { place: 3, ring: 'medal-ring-bronze', height: 'h-16', color: '#E0A271' },
+] as const
 
 export function Leaderboard() {
   const { profile } = useAuth()
@@ -42,18 +47,22 @@ export function Leaderboard() {
     void load(scope)
   }, [load, scope])
 
+  const podium = rows.slice(0, 3)
+  const rest = rows.slice(3)
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-bold text-slate-50">Leaderboard</h1>
-          <p className="mt-1 text-sm text-slate-500">Weekly consistency, calculated by the database</p>
+          <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan">Season 01</div>
+          <h1 className="mt-1 font-display text-[1.9rem] font-extrabold text-slate-50 sm:text-4xl">Ranked ladder</h1>
+          <p className="mt-1 text-sm text-slate-500">Weekly consistency, scored by the database</p>
         </div>
         <Segmented<Scope>
           value={scope}
           onChange={setScope}
           options={[
-            { value: 'friends', label: 'Friends' },
+            { value: 'friends', label: 'Squad' },
             { value: 'global', label: 'Public' },
           ]}
         />
@@ -61,126 +70,151 @@ export function Leaderboard() {
 
       {error ? <ErrorNote>{error}</ErrorNote> : null}
 
-      <Card>
-        <SectionTitle
-          title="This week"
-          hint="10 points per completion · 50 per achievement earned this week"
-          action={
-            <span className="chip">
-              <Trophy size={11} className="text-amber" /> {rows.length} ranked
-            </span>
-          }
-        />
-        {loading ? (
-          <div className="grid place-items-center py-16">
-            <Spinner label="Ranking" />
+      {loading ? (
+        <Card>
+          <div className="grid place-items-center py-20">
+            <Spinner label="Ranking the ladder" />
           </div>
-        ) : rows.length ? (
-          <div className="-mx-2 overflow-x-auto">
-            <table className="w-full min-w-[620px] border-separate border-spacing-y-1 px-2 text-sm">
-              <thead>
-                <tr className="text-left text-[10px] uppercase tracking-[0.14em] text-slate-500">
-                  <th className="px-3 py-2 font-semibold">Rank</th>
-                  <th className="px-3 py-2 font-semibold">Member</th>
-                  <th className="px-3 py-2 text-right font-semibold">Week</th>
-                  <th className="px-3 py-2 text-right font-semibold">Points</th>
-                  <th className="px-3 py-2 text-right font-semibold">Streak</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, index) => {
-                  const mine = row.user_id === profile?.id
-                  const rank = index + 1
-                  return (
-                    <tr
-                      key={row.user_id}
-                      className={cx(
-                        'rounded-xl transition',
-                        mine ? 'bg-neon/[0.08]' : 'bg-white/[0.015] hover:bg-white/[0.035]',
-                      )}
-                    >
-                      <td className="rounded-l-xl px-3 py-3">
-                        <span
-                          className={cx(
-                            'inline-flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-bold',
-                            rank === 1
-                              ? 'border-amber/40 bg-amber/15 text-amber'
-                              : rank === 2
-                                ? 'border-slate-400/40 bg-slate-400/10 text-slate-300'
-                                : rank === 3
-                                  ? 'border-amber/25 bg-amber/[0.08] text-amber/80'
-                                  : 'border-white/10 text-slate-500',
-                          )}
-                        >
-                          {rank === 1 ? <Crown size={13} /> : rank <= 3 ? <Medal size={13} /> : rank}
+        </Card>
+      ) : rows.length ? (
+        <>
+          <section className="hud relative overflow-hidden p-5 sm:p-7">
+            <div className="pointer-events-none absolute inset-x-0 -top-24 h-48 bg-neon/10 blur-3xl" />
+            <div className="relative mb-6 flex items-center justify-between">
+              <div>
+                <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-cyan">Top of the ladder</div>
+                <div className="mt-1 font-display text-lg font-extrabold text-slate-50">Podium</div>
+              </div>
+              <span className="chip">
+                <Trophy size={11} className="text-gold" /> {rows.length} ranked
+              </span>
+            </div>
+
+            <div className="relative grid grid-cols-3 items-end gap-2 sm:gap-4">
+              {PODIUM.map((slot) => {
+                const row = podium[slot.place - 1]
+                if (!row) return <div key={slot.place} />
+                const mine = row.user_id === profile?.id
+                return (
+                  <div key={row.user_id} className="flex flex-col items-center">
+                    <Avatar name={row.display_name} src={row.avatar_url} size={slot.place === 1 ? 56 : 44} ring />
+                    {slot.place === 1 ? <Crown size={16} className="mt-1 text-gold" /> : null}
+                    <div className={cx('mt-1.5 max-w-full truncate text-center text-xs font-semibold', mine ? 'text-cyan' : 'text-slate-200')}>
+                      {row.display_name}
+                    </div>
+                    <div className="font-mono text-[10px] text-slate-500">@{row.username}</div>
+                    <div className="mt-3 w-full overflow-hidden rounded-t-xl border border-white/[0.08] bg-white/[0.02]">
+                      <div className={cx('flex flex-col items-center justify-center gap-0.5', slot.height)}>
+                        <span className="font-display text-lg font-extrabold" style={{ color: slot.color }}>
+                          {slot.place}
                         </span>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar name={row.display_name} src={row.avatar_url} size={30} />
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium text-slate-100">
-                              {row.display_name}
-                              {mine ? <span className="ml-2 text-[10px] text-neon">you</span> : null}
-                            </div>
-                            <div className="truncate text-[11px] text-slate-500">@{row.username}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <div className="font-semibold text-slate-200">{row.pct}%</div>
-                        <div className="text-[10px] text-slate-500">
-                          {row.done}/{row.due}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-right font-mono text-sm text-neon-soft">{row.points}</td>
-                      <td className="rounded-r-xl px-3 py-3 text-right">
-                        <span className="inline-flex items-center gap-1 text-xs text-amber">
-                          <Flame size={11} /> {row.streak}
+                        <span className="font-mono text-[10px] text-slate-400">{row.points} pts</span>
+                        <span className="inline-flex items-center gap-1 font-mono text-[9px] text-amber">
+                          <Flame size={9} /> {row.streak}
                         </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
+                      </div>
+                    </div>
+                    <div className="h-1 w-full rounded-b bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+
+          <Card accent="#8B5CF6">
+            <SectionTitle
+              title="Full standings"
+              hint="10 points per completion · 50 per achievement earned this week"
+              accent="#8B5CF6"
+              action={
+                <span className="chip font-mono">
+                  <Trophy size={11} className="text-amber" /> {rows.length}
+                </span>
+              }
+            />
+            <ul className="space-y-1.5">
+              {rest.map((row, index) => {
+                const rank = index + 4
+                const mine = row.user_id === profile?.id
+                return (
+                  <li
+                    key={row.user_id}
+                    className={cx(
+                      'flex items-center gap-3 rounded-xl border px-3 py-2.5 transition',
+                      mine
+                        ? 'border-cyan/30 bg-cyan/[0.07]'
+                        : 'border-white/[0.06] bg-white/[0.015] hover:border-white/[0.12]',
+                    )}
+                  >
+                    <span className="w-6 text-center font-mono text-[11px] font-semibold text-slate-500">{rank}</span>
+                    <Avatar name={row.display_name} src={row.avatar_url} size={30} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-semibold text-slate-100">
+                        {row.display_name}
+                        {mine ? <span className="ml-2 font-mono text-[9px] uppercase tracking-[0.14em] text-cyan">you</span> : null}
+                      </div>
+                      <div className="truncate font-mono text-[10px] text-slate-500">@{row.username}</div>
+                    </div>
+                    <div className="hidden w-16 text-right sm:block">
+                      <div className="font-mono text-[11px] text-slate-300">{row.pct}%</div>
+                      <div className="font-mono text-[9px] text-slate-600">
+                        {row.done}/{row.due}
+                      </div>
+                    </div>
+                    <div className="w-16 text-right font-mono text-sm font-semibold text-cyan">{row.points}</div>
+                    <span className="inline-flex w-10 items-center justify-end gap-1 font-mono text-[10px] text-amber">
+                      <Flame size={10} /> {row.streak}
+                    </span>
+                  </li>
+                )
+              })}
+              {!rest.length ? (
+                <li className="rounded-xl border border-dashed border-white/10 px-3 py-6 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-slate-600">
+                  Podium is the whole ladder right now
+                </li>
+              ) : null}
+            </ul>
+          </Card>
+        </>
+      ) : (
+        <Card>
           <EmptyState
             icon={<Trophy size={20} />}
-            title={scope === 'friends' ? 'No friends on the board yet' : 'Nobody is public yet'}
+            title={scope === 'friends' ? 'No squad on the board yet' : 'Nobody is public yet'}
             body={
               scope === 'friends'
-                ? 'Add a friend and complete a habit — the board fills as soon as they accept.'
+                ? 'Add a friend and complete a quest — the board fills as soon as they accept.'
                 : 'Members appear here only when their profile is public and they share stats.'
             }
             action={
               <Link to="/friends" className="btn-primary">
-                Find friends
+                Find squad
               </Link>
             }
           />
-        )}
-      </Card>
+        </Card>
+      )}
 
       <Card>
-        <SectionTitle title="How scoring works" hint="Transparent, and impossible to inflate from the browser" />
+        <SectionTitle title="Scoring, in the open" hint="Transparent, and impossible to inflate from the browser" />
         <ul className="space-y-2 text-xs leading-relaxed text-slate-400">
           <li>
-            <span className="font-semibold text-slate-200">Completion rate</span> = completed scheduled habits ÷
-            scheduled habits × 100. Days with nothing scheduled are ignored, not counted as failures.
+            <span className="font-semibold text-slate-200">Completion rate</span> = completed scheduled quests ÷ scheduled
+            quests × 100. Days with nothing scheduled are ignored, not counted as failures.
           </li>
           <li>
-            <span className="font-semibold text-slate-200">Points</span> = 10 × completions this week + 50 ×
-            achievements earned this week. Completions are written once per habit per day (a unique constraint blocks
-            duplicates).
+            <span className="font-semibold text-slate-200">Points</span> = 10 × completions this week + 50 × achievements
+            earned this week. A unique constraint blocks logging the same quest twice in a day.
           </li>
           <li>
             <span className="font-semibold text-slate-200">Streaks</span> count consecutive perfect days. An unfinished
-            today does not break yesterday's streak.
+            today does not break yesterday's run.
           </li>
-          <li>Only aggregates leave the database — friend views never include habit names or notes.</li>
+          <li>Only aggregates leave the database — rivals never receive habit names, notes or schedules.</li>
         </ul>
+        <div className="mt-4 flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.18em] text-slate-600">
+          <Medal size={11} /> verified server-side
+        </div>
       </Card>
     </div>
   )

@@ -1,20 +1,51 @@
-import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import {
+  useEffect,
+  useId,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+} from 'react'
 import { X } from 'lucide-react'
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ')
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx('panel p-5', className)}>{children}</div>
+export function Card({
+  children,
+  className,
+  accent,
+}: {
+  children: ReactNode
+  className?: string
+  accent?: string
+}) {
+  return (
+    <div className={cx('panel relative p-5', className)}>
+      {accent ? (
+        <span
+          className="pointer-events-none absolute inset-x-5 -top-px h-px"
+          style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
+        />
+      ) : null}
+      {children}
+    </div>
+  )
 }
 
 export function Button({
   variant = 'primary',
   className,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger' }) {
-  const map = { primary: 'btn-primary', ghost: 'btn-ghost', danger: 'btn-danger' } as const
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'danger' | 'gold' }) {
+  const map = {
+    primary: 'btn-primary',
+    ghost: 'btn-ghost',
+    danger: 'btn-danger',
+    gold: 'btn-gold',
+  } as const
   return <button className={cx(map[variant], className)} {...props} />
 }
 
@@ -56,10 +87,12 @@ export function Avatar({
   name,
   src,
   size = 40,
+  ring = false,
 }: {
   name: string
   src?: string | null
   size?: number
+  ring?: boolean
 }) {
   const initials = name
     .split(/\s+/)
@@ -67,24 +100,33 @@ export function Avatar({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('')
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={name}
-        width={size}
-        height={size}
-        style={{ width: size, height: size }}
-        className="shrink-0 rounded-full border border-white/10 object-cover"
-      />
-    )
-  }
-  return (
+
+  const inner = src ? (
+    <img
+      src={src}
+      alt={name}
+      width={size}
+      height={size}
+      style={{ width: size, height: size }}
+      className="rounded-full border border-white/10 object-cover"
+    />
+  ) : (
     <span
       style={{ width: size, height: size, fontSize: Math.max(11, size * 0.36) }}
-      className="flex shrink-0 items-center justify-center rounded-full border border-neon/30 bg-neon/15 font-semibold text-neon-soft"
+      className="flex items-center justify-center rounded-full border border-neon/30 bg-gradient-to-br from-neon/25 to-violet/20 font-semibold text-neon-soft"
     >
       {initials || '?'}
+    </span>
+  )
+
+  if (!ring) return <span className="shrink-0">{inner}</span>
+
+  return (
+    <span
+      className="medal-ring relative inline-grid shrink-0 place-items-center rounded-full p-[2px]"
+      style={{ width: size + 6, height: size + 6 }}
+    >
+      <span className="grid place-items-center rounded-full bg-ink-950 p-[2px]">{inner}</span>
     </span>
   )
 }
@@ -94,43 +136,92 @@ export function ProgressRing({
   size = 148,
   stroke = 10,
   caption,
+  tone = 'neon',
 }: {
   pct: number
   size?: number
   stroke?: number
   caption?: string
+  tone?: 'neon' | 'gold' | 'mint'
 }) {
+  const id = useId().replace(/:/g, '')
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(100, Math.round(pct)))
   const offset = circumference * (1 - clamped / 100)
+  const stops =
+    tone === 'gold'
+      ? ['#FFE9A8', '#FFC857', '#FF9A3D']
+      : tone === 'mint'
+        ? ['#3CE6A0', '#38E8FF', '#4C8DFF']
+        : ['#7FE9FF', '#4C8DFF', '#8B5CF6']
+
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#141A24" strokeWidth={stroke} />
+      <svg width={size} height={size} className="-rotate-90 overflow-visible">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#121828" strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="url(#ringGradient)"
+          stroke={`url(#ring-${id})`}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 700ms cubic-bezier(.22,.8,.3,1)' }}
+          style={{
+            transition: 'stroke-dashoffset 800ms cubic-bezier(.22,.8,.3,1)',
+            filter: 'drop-shadow(0 0 10px rgba(76,141,255,0.55))',
+          }}
         />
         <defs>
-          <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#2E8BFF" />
-            <stop offset="70%" stopColor="#22D3EE" />
-            <stop offset="100%" stopColor="#8B5CF6" />
+          <linearGradient id={`ring-${id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={stops[0]} />
+            <stop offset="60%" stopColor={stops[1]} />
+            <stop offset="100%" stopColor={stops[2]} />
           </linearGradient>
         </defs>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-3xl font-bold leading-none text-slate-50">{clamped}%</span>
-        {caption ? <span className="mt-1 text-[10px] text-slate-400">{caption}</span> : null}
+        <span className="font-display text-[2rem] font-extrabold leading-none tracking-tight text-slate-50">
+          {clamped}
+          <span className="text-base font-bold text-slate-500">%</span>
+        </span>
+        {caption ? (
+          <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">{caption}</span>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+export function XPBar({
+  value,
+  level,
+  name,
+  inLevel,
+  forLevel,
+}: {
+  value: number
+  level: number
+  name: string
+  inLevel: number
+  forLevel: number
+}) {
+  const pct = Math.max(0, Math.min(100, Math.round(value * 100)))
+  return (
+    <div>
+      <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.18em]">
+        <span className="text-cyan">
+          Lv {level} · {name}
+        </span>
+        <span className="font-mono text-slate-500">
+          {inLevel}/{forLevel} XP
+        </span>
+      </div>
+      <div className="xp-track mt-2">
+        <span className="xp-fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
@@ -142,25 +233,27 @@ export function StatCard({
   hint,
   icon,
   accent = 'text-neon',
+  tone,
 }: {
   label: string
   value: string
   hint?: string
   icon: ReactNode
   accent?: string
+  tone?: string
 }) {
   return (
-    <div className="panel flex flex-col gap-3 p-4">
+    <div className="tile p-4" style={{ ['--tone' as string]: tone ?? 'rgba(76,141,255,.7)' } as CSSProperties}>
       <div className="flex items-start justify-between gap-2">
-        <span className={cx('text-xs font-medium text-slate-400', accent)}>{label}</span>
-        <span className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-300">
+        <span className={cx('text-[10px] font-semibold uppercase tracking-[0.16em]', accent)}>{label}</span>
+        <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-300">
           {icon}
         </span>
       </div>
-      <div>
-        <div className="font-display text-2xl font-bold leading-none text-slate-50">{value}</div>
-        {hint ? <div className="mt-1 text-[11px] text-slate-500">{hint}</div> : null}
+      <div className="mt-3 font-display text-[1.7rem] font-extrabold leading-none tracking-tight text-slate-50">
+        {value}
       </div>
+      {hint ? <div className="mt-1.5 font-mono text-[10px] text-slate-500">{hint}</div> : null}
     </div>
   )
 }
@@ -185,12 +278,28 @@ export function Badge({
   )
 }
 
-export function SectionTitle({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
+export function SectionTitle({
+  title,
+  hint,
+  action,
+  accent = '#4C8DFF',
+}: {
+  title: string
+  hint?: string
+  action?: ReactNode
+  accent?: string
+}) {
   return (
-    <div className="mb-3 flex items-end justify-between gap-4">
-      <div>
-        <h2 className="font-display text-base font-semibold text-slate-100">{title}</h2>
-        {hint ? <p className="mt-0.5 text-xs text-slate-500">{hint}</p> : null}
+    <div className="mb-4 flex items-end justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <span
+          className="mt-1 h-4 w-[3px] shrink-0 rounded-full"
+          style={{ background: accent, boxShadow: `0 0 12px ${accent}` }}
+        />
+        <div>
+          <h2 className="font-display text-[15px] font-bold tracking-tight text-slate-50">{title}</h2>
+          {hint ? <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p> : null}
+        </div>
       </div>
       {action}
     </div>
@@ -210,10 +319,10 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-xl2 border border-dashed border-white/10 bg-white/[0.015] px-6 py-12 text-center">
-      <div className="mb-3 grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-neon">
+      <div className="mb-3 grid h-11 w-11 place-items-center rounded-xl border border-neon/25 bg-neon/10 text-neon shadow-neon">
         {icon}
       </div>
-      <h3 className="font-display text-sm font-semibold text-slate-100">{title}</h3>
+      <h3 className="font-display text-sm font-bold text-slate-100">{title}</h3>
       <p className="mt-1 max-w-sm text-xs leading-relaxed text-slate-500">{body}</p>
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
@@ -223,7 +332,7 @@ export function EmptyState({
 export function Spinner({ label }: { label?: string }) {
   return (
     <div className="flex items-center gap-3 text-sm text-slate-400">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-neon" />
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-cyan" />
       {label ?? 'Loading'}
     </div>
   )
@@ -262,23 +371,27 @@ export function Modal({
 
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-3 backdrop-blur-sm sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 p-3 backdrop-blur-sm sm:items-center">
       <button aria-label="Close dialog" className="absolute inset-0 cursor-default" onClick={onClose} />
-      <div className={cx('relative w-full rounded-xl2 border border-white/10 bg-ink-850 shadow-lift rise', width)}>
-        <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] px-5 py-4">
+      <div className={cx('hud rise relative w-full', width)}>
+        <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-neon/70 to-transparent" />
+        <div className="flex items-start justify-between gap-4 border-b border-white/[0.07] px-5 py-4">
           <div>
-            <h2 className="font-display text-base font-semibold text-slate-100">{title}</h2>
+            <h2 className="font-display text-base font-bold text-slate-100">{title}</h2>
             {description ? <p className="mt-0.5 text-xs text-slate-500">{description}</p> : null}
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="grid h-8 w-8 place-items-center rounded-lg border border-white/10 text-slate-400 transition hover:border-white/20 hover:text-slate-200"
           >
             <X size={16} />
           </button>
         </div>
         <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
-        {footer ? <div className="flex justify-end gap-2 border-t border-white/[0.06] px-5 py-3">{footer}</div> : null}
+        {footer ? (
+          <div className="flex justify-end gap-2 border-t border-white/[0.07] px-5 py-3">{footer}</div>
+        ) : null}
       </div>
     </div>
   )
@@ -308,7 +421,7 @@ export function Toggle({
         onClick={() => onChange(!checked)}
         className={cx(
           'relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition',
-          checked ? 'border-neon/50 bg-neon' : 'border-white/10 bg-white/10',
+          checked ? 'border-neon/60 bg-gradient-to-r from-cyan to-neon shadow-neon' : 'border-white/10 bg-white/10',
         )}
       >
         <span
@@ -332,19 +445,24 @@ export function Segmented<T extends string>({
   onChange: (next: T) => void
 }) {
   return (
-    <div className="inline-flex rounded-xl border border-white/10 bg-black/30 p-1">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          onClick={() => onChange(option.value)}
-          className={cx(
-            'rounded-lg px-3 py-1.5 text-xs font-semibold transition',
-            option.value === value ? 'bg-neon text-[#04121B]' : 'text-slate-400 hover:text-slate-200',
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
+    <div className="inline-flex rounded-xl border border-white/10 bg-black/40 p-1 backdrop-blur">
+      {options.map((option) => {
+        const active = option.value === value
+        return (
+          <button
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            className={cx(
+              'relative rounded-lg px-3 py-1.5 text-xs font-semibold transition',
+              active
+                ? 'bg-gradient-to-r from-cyan/25 to-violet/25 text-slate-50 shadow-[inset_0_1px_0_rgba(255,255,255,.15)]'
+                : 'text-slate-400 hover:text-slate-200',
+            )}
+          >
+            {option.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -357,6 +475,6 @@ export function ErrorNote({ children }: { children: ReactNode }) {
 
 export function Notice({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-neon/25 bg-neon/10 px-3.5 py-2.5 text-xs text-neon-soft">{children}</div>
+    <div className="rounded-xl border border-mint/25 bg-mint/10 px-3.5 py-2.5 text-xs text-mint">{children}</div>
   )
 }
