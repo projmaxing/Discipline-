@@ -120,9 +120,15 @@ and is used by every aggregate so due counts are always consistent.
 - Best streak scans 400 days of derived daily progress.
 
 All of it is computed inside `SECURITY DEFINER` functions from `completions` rows.
-The browser cannot submit a score, and `user_daily`, `user_streak`, `habit_due_on`,
-`handle_completion` and `handle_new_user` have `EXECUTE` revoked from `anon` and
-`authenticated`.
+The browser cannot submit a score, and `user_daily`, `user_streak`, `user_best_streak`,
+`habit_due_on`, `handle_completion` and `handle_new_user` have `EXECUTE` revoked from
+`anon` and `authenticated`.
+
+The relationship predicates `is_friend`, `is_blocked` and `can_view_profile` remain
+executable by signed-in users because RLS policy expressions run with the caller's
+privileges — revoking them would break every profile, achievement and activity read.
+The exposure is limited to "does an accepted friendship/block exist between these two
+ids"; habit names, notes, schedules and completion rows are never returned.
 
 ---
 
@@ -163,16 +169,37 @@ Mapping details, what carries over and what does not live in
 
 Performed in this environment:
 
-- `npm install` (184 packages) and `npm run build` — see the build output below.
-- `npx tsc --noEmit` across the whole frontend.
-- Production preview served and the shell fetched over HTTP.
+- `npm install` (184 packages), `npx tsc --noEmit` clean, `npm run build` exit 0
+  (2,239 modules, 912 KB `dist`), production preview served with a 200 on both the
+  HTML and the JS asset.
+- **The migration was executed against a real PostgreSQL server**, with Supabase's
+  `anon` / `authenticated` / `service_role` roles, `auth.uid()` and its default
+  grants stubbed in, then attacked with 31 assertions as two different users. All
+  passed:
+  - the signup trigger created profiles and privacy rows; usernames were derived from
+    email when no metadata was supplied;
+  - duplicate completions were blocked by the unique index, and forged completions or
+    forged habit ownership were rejected by RLS;
+  - a stranger saw zero habits, completions, profiles, achievements and activity;
+  - friend requests could only be created as `pending`, duplicates hit the pair index,
+    self-requests were rejected, and comparison was denied until acceptance;
+  - after acceptance the profile and aggregates became visible, habits stayed
+    invisible, and the leaderboard score matched the formula (`10 + 2 × 50 = 110`);
+  - `share_stats = false` denied comparison and hid achievements, blocking hid the
+    profile and removed the user from the leaderboard, and unblocking restored it;
+  - `user_daily`, `user_streak`, `user_best_streak` and `habit_due_on` were unreachable
+    for `anon`/`authenticated`, leaving only the four intended RPCs.
+
+This found and fixed two real defects: friend-visible achievements and activity were
+silently denied because the policy read `privacy_settings` as the caller (whose own
+policy hid the row), and three scoring helpers were still executable by signed-in
+users, leaking other users' streaks.
 
 **Not performed (no credentials / no browser automation available):**
-- Signup, login, session persistence and password recovery against a real project.
-- RLS behaviour, trigger scoring and the friend/leaderboard functions against a live
-  database. The SQL is written to be applied with `supabase db push` or the SQL
-  editor, but it has not been executed here.
-- Cross-browser and mobile device testing of the rendered app.
+- Signup, login, session persistence and password recovery against a hosted Supabase
+  project. The SQL ran against stock PostgreSQL with Supabase's surface stubbed, not
+  against the hosted service.
+- Any browser interaction or cross-browser/mobile testing of the rendered app.
 
 Treat the backend as *designed and reviewed*, not *verified*. The first thing to do
 after connecting a project is walk through the manual test list in

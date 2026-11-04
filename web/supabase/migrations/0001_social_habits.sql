@@ -151,6 +151,19 @@ returns boolean language sql stable security definer set search_path = public as
   end;
 $$;
 
+-- Privacy flags must be read through definer helpers: a policy that selects
+-- `privacy_settings` directly runs as the caller, whose own RLS policy hides
+-- every row but their own, so friend visibility would silently evaluate false.
+create or replace function public.shares_stats(p_user uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((select share_stats from public.privacy_settings where user_id = p_user), false);
+$$;
+
+create or replace function public.shares_activity(p_user uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((select share_activity from public.privacy_settings where user_id = p_user), false);
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Scheduling + progress (mirrors the desktop app's recurrence rules)
 -- ---------------------------------------------------------------------------
@@ -640,7 +653,7 @@ create policy achievements_read on public.achievements
     or (
       public.is_friend(auth.uid(), user_id)
       and not public.is_blocked(auth.uid(), user_id)
-      and coalesce((select share_stats from public.privacy_settings where user_id = achievements.user_id), false)
+      and public.shares_stats(user_id)
     )
   );
 
@@ -654,7 +667,7 @@ create policy activity_read on public.activity_events
     or (
       public.is_friend(auth.uid(), user_id)
       and not public.is_blocked(auth.uid(), user_id)
-      and coalesce((select share_activity from public.privacy_settings where user_id = activity_events.user_id), false)
+      and public.shares_activity(user_id)
     )
   );
 
@@ -664,16 +677,30 @@ create policy activity_read on public.activity_events
 -- Grants: internal helpers stay unreachable from the browser
 -- ---------------------------------------------------------------------------
 revoke all on function public.user_daily(uuid, int) from public, anon, authenticated;
-revoke all on function public.user_streak(uuid) from public, anon;
-revoke all on function public.user_best_streak(uuid) from public, anon;
-revoke all on function public.habit_due_on(text, smallint[], date) from public, anon;
+revoke all on function public.user_streak(uuid) from public, anon, authenticated;
+revoke all on function public.user_best_streak(uuid) from public, anon, authenticated;
+revoke all on function public.habit_due_on(text, smallint[], date) from public, anon, authenticated;
+-- Relationship predicates stay executable by `authenticated` on purpose: RLS
+-- policy expressions are evaluated with the caller's privileges, so revoking
+-- these would make profile, achievement and activity reads fail outright.
+-- They expose only whether an accepted friendship or block exists between two
+-- ids — never habit names, notes or schedules.
 revoke all on function public.is_blocked(uuid, uuid) from public, anon;
 revoke all on function public.is_friend(uuid, uuid) from public, anon;
 revoke all on function public.can_view_profile(uuid, uuid) from public, anon;
+revoke all on function public.shares_stats(uuid) from public, anon;
+revoke all on function public.shares_activity(uuid) from public, anon;
 revoke all on function public.handle_completion() from public, anon, authenticated;
 revoke all on function public.handle_new_user() from public, anon, authenticated;
 
 grant usage on schema public to authenticated;
+
+-- The RPCs below are for signed-in users only; default privileges would
+-- otherwise leave them callable with the anonymous key.
+revoke all on function public.compare_stats(uuid) from public, anon;
+revoke all on function public.leaderboard(text, int) from public, anon;
+revoke all on function public.search_profiles(text) from public, anon;
+revoke all on function public.username_available(text) from public, anon;
 
 grant execute on function public.compare_stats(uuid) to authenticated;
 grant execute on function public.leaderboard(text, int) to authenticated;
